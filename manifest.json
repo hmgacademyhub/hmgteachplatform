@@ -1,7 +1,7 @@
 {
-  "name": "HMG Teaching Platform v4",
-  "short_name": "HMG Teach v4",
-  "description": "Cross-device teaching platform - phones, tablets, laptops. Record while using Google Meet.",
+  "name": "HMG Teaching Platform v5",
+  "short_name": "HMG Teach v5",
+  "description": "Enterprise teaching platform v5 - Professional whiteboard, App Launcher, Full-screen split view",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0f172a",

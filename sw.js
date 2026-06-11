@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hmg-v4-2026';
+const CACHE_NAME = 'hmg-v5-2026';
 const urlsToCache = ['./index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
