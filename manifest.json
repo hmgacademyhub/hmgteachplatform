@@ -1,0 +1,16 @@
+{
+  "name": "HMG Teaching Platform v4",
+  "short_name": "HMG Teach v4",
+  "description": "Cross-device teaching platform - phones, tablets, laptops. Record while using Google Meet.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1e40af",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%231e40af'/%3E%3Ctext x='50' y='68' font-size='50' fill='white' text-anchor='middle' font-weight='700'%3EH%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}

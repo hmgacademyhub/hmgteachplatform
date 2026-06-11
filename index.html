@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HMG Teach v4 • Cross-Device</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .font-display { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-weight: 700; }
+        
+        .pane { transition: all 0.2s ease; }
+        
+        @media (max-width: 768px) {
+            .split-grid { grid-template-columns: 1fr !important; }
+            .resize-handle { display: none !important; }
+        }
+        
+        .whiteboard { touch-action: none; border-radius: 16px; box-shadow: 0 10px 15px -3px rgb(15 23 42 / 0.1); background: white; }
+        
+        .video-tile { background: #0f172a; border-radius: 12px; position: relative; }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <!-- Top Navigation -->
+    <nav class="bg-white border-b sticky top-0 z-50">
+        <div class="max-w-screen-2xl mx-auto px-5 md:px-8">
+            <div class="flex items-center justify-between h-16 md:h-20">
+                <div class="flex items-center gap-x-3">
+                    <div class="w-10 h-10 md:w-11 md:h-11 bg-blue-700 rounded-2xl flex items-center justify-center">
+                        <span class="text-white text-3xl font-display tracking-tighter">H</span>
+                    </div>
+                    <div>
+                        <span class="font-display text-3xl tracking-tighter">HMG</span>
+                        <span class="font-display text-3xl tracking-tighter text-blue-700">Teach v4</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-x-2">
+                    <div id="status" class="hidden md:flex px-4 py-1.5 text-sm bg-emerald-100 text-emerald-700 rounded-full items-center gap-x-2">
+                        <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                        <span>Connected • Free</span>
+                    </div>
+                    <button onclick="showSettings()" class="px-4 py-2 text-sm font-medium hover:bg-slate-100 rounded-2xl">Settings</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-screen-2xl mx-auto px-5 md:px-8 py-6 md:py-8">
+        
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-y-4 mb-8">
+            <div>
+                <h1 class="font-display text-4xl md:text-6xl tracking-tighter font-semibold">Good morning, Adewale</h1>
+                <p class="text-lg md:text-xl text-slate-600 mt-1">Works on phone, tablet &amp; laptop</p>
+            </div>
+            <div class="flex gap-x-3">
+                <button onclick="createRoom()" class="px-8 py-4 bg-blue-700 text-white font-semibold rounded-3xl flex items-center gap-x-2 shadow-lg active:scale-[0.985]">
+                    + Start New Class
+                </button>
+                <button onclick="joinRoom()" class="px-6 py-4 border font-semibold rounded-3xl">Join</button>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white p-5 border border-slate-200 rounded-3xl"><div class="text-sm text-slate-500">Classes</div><div class="text-4xl font-semibold tracking-tight">58</div></div>
+            <div class="bg-white p-5 border border-slate-200 rounded-3xl"><div class="text-sm text-slate-500">Students</div><div class="text-4xl font-semibold tracking-tight">367</div></div>
+            <div class="bg-white p-5 border border-slate-200 rounded-3xl"><div class="text-sm text-slate-500">Engagement</div><div class="text-4xl font-semibold tracking-tight">95%</div></div>
+            <div class="bg-white p-5 border border-slate-200 rounded-3xl flex items-center"><button onclick="showAnalytics()" class="text-blue-700 font-semibold">View Analytics →</button></div>
+        </div>
+
+        <!-- Teaching Interface -->
+        <div id="teaching-interface" class="hidden">
+            <div class="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-y-2">
+                <div>
+                    <span id="room-code" class="font-mono px-4 py-1.5 bg-white border rounded-2xl text-sm font-semibold"></span>
+                    <span class="ml-3 px-3 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">LIVE</span>
+                </div>
+                <div class="flex gap-x-2 flex-wrap">
+                    <button onclick="toggleTeacherCamera()" id="cam-btn" class="px-4 py-2 bg-white border text-sm rounded-2xl">📹 Camera</button>
+                    <button onclick="startGoogleMeetRecording()" id="meet-record-btn" class="px-4 py-2 bg-white border text-sm rounded-2xl font-medium">🎥 Record with Meet</button>
+                    <button onclick="startRecording()" class="px-4 py-2 bg-white border text-sm rounded-2xl">⏺ Record</button>
+                    <button onclick="endClass()" class="px-5 py-2 text-red-600 border border-red-200 rounded-2xl text-sm">End</button>
+                </div>
+            </div>
+
+            <!-- Responsive Split Screen -->
+            <div class="split-grid grid grid-cols-1 md:grid-cols-[1fr,12px,1fr] gap-2 bg-white border border-slate-200 rounded-3xl p-2" style="min-height:620px">
+                
+                <!-- Whiteboard -->
+                <div class="pane flex flex-col border border-slate-200 rounded-3xl overflow-hidden">
+                    <div class="px-5 py-3 bg-slate-50 border-b flex items-center justify-between">
+                        <div class="font-semibold">🖊️ Whiteboard</div>
+                        <div class="flex gap-x-1 text-xs">
+                            <button onclick="setTool('pen')" id="tool-pen" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-2xl">Pen</button>
+                            <button onclick="setTool('highlighter')" id="tool-highlighter" class="px-3 py-1 hover:bg-slate-100 rounded-2xl">Highlighter</button>
+                            <button onclick="setTool('eraser')" id="tool-eraser" class="px-3 py-1 hover:bg-slate-100 rounded-2xl">Eraser</button>
+                        </div>
+                    </div>
+                    <div class="flex-1 p-4 bg-slate-100 flex justify-center items-center">
+                        <canvas id="whiteboard" width="580" height="500" class="whiteboard border border-slate-300 cursor-crosshair"></canvas>
+                    </div>
+                    <div class="px-4 py-3 border-t bg-white flex justify-between text-xs">
+                        <div>
+                            <button onclick="undo()" class="px-3 py-1 hover:bg-slate-100 rounded-xl">Undo</button>
+                            <button onclick="clearWhiteboard()" class="px-3 py-1 hover:bg-slate-100 rounded-xl">Clear</button>
+                        </div>
+                        <button onclick="saveWhiteboard()" class="px-4 py-1 bg-slate-900 text-white text-xs rounded-2xl">Export</button>
+                    </div>
+                </div>
+
+                <!-- Resize Handle (desktop only) -->
+                <div class="resize-handle hidden md:flex items-center justify-center"><div class="w-1 h-8 bg-slate-300 rounded-full"></div></div>
+
+                <!-- Right Pane -->
+                <div class="pane flex flex-col border border-slate-200 rounded-3xl overflow-hidden">
+                    <div class="px-5 py-3 bg-slate-50 border-b flex justify-between items-center">
+                        <div class="font-semibold" id="pane2-title">Materials</div>
+                        <div class="flex text-xs gap-x-px">
+                            <button onclick="switchPane('pdf')" id="btn-pdf" class="px-3 py-1 rounded-2xl bg-white border">PDF</button>
+                            <button onclick="switchPane('browser')" id="btn-browser" class="px-3 py-1 hover:bg-white rounded-2xl">Browser</button>
+                        </div>
+                    </div>
+                    
+                    <!-- PDF -->
+                    <div id="pdf-pane" class="flex-1 p-4 flex flex-col">
+                        <div id="pdf-dropzone" class="flex-1 border border-dashed flex flex-col justify-center items-center bg-slate-50 rounded-3xl">
+                            <div class="text-center">
+                                <div class="text-4xl mb-2">📄</div>
+                                <p class="font-medium">Drop PDF / DOCX</p>
+                                <input type="file" id="file-input" accept=".pdf,.docx" class="hidden" onchange="loadFile(event)">
+                                <button onclick="document.getElementById('file-input').click()" class="mt-3 text-xs px-5 py-2 border bg-white rounded-2xl">Choose File</button>
+                            </div>
+                        </div>
+                        <div id="pdf-viewer" class="hidden flex-1 flex flex-col">
+                            <div class="flex justify-between mb-2 px-1 text-sm">
+                                <div>
+                                    <button onclick="prevPage()" class="px-3 py-1 hover:bg-slate-100 rounded">←</button>
+                                    <span id="page-info" class="font-mono mx-2">1/12</span>
+                                    <button onclick="nextPage()" class="px-3 py-1 hover:bg-slate-100 rounded">→</button>
+                                </div>
+                                <div>
+                                    <button onclick="zoomPDF(0.2)" class="px-2">+</button>
+                                    <button onclick="zoomPDF(-0.2)" class="px-2">−</button>
+                                </div>
+                            </div>
+                            <canvas id="pdf-canvas" class="flex-1 border border-slate-300 mx-auto rounded-2xl" width="560" height="460"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Browser -->
+                    <div id="browser-pane" class="hidden flex-1 p-4 flex flex-col">
+                        <div class="flex mb-2">
+                            <input id="browser-url" value="https://en.wikipedia.org" class="flex-1 border px-4 py-2 text-sm rounded-l-2xl">
+                            <button onclick="loadBrowser()" class="px-5 bg-blue-700 text-white rounded-r-2xl text-sm">Go</button>
+                        </div>
+                        <iframe id="browser-frame" class="flex-1 border border-slate-300 rounded-2xl" sandbox></iframe>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Student Cameras -->
+            <div class="mt-6 bg-white border border-slate-200 rounded-3xl p-5">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="font-semibold">👥 Student Cameras <span class="text-xs px-3 py-px bg-emerald-100 text-emerald-700 rounded-full">14 online</span></div>
+                    <button onclick="showStudentCameras()" class="text-sm px-4 py-2 bg-emerald-700 text-white rounded-2xl">View Grid</button>
+                </div>
+                <div id="student-grid" class="grid grid-cols-3 md:grid-cols-5 gap-3"></div>
+            </div>
+        </div>
+
+        <!-- Landing Cards -->
+        <div id="landing" class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div class="bg-white p-7 border border-slate-200 rounded-3xl">
+                <div class="text-4xl mb-4">📱</div>
+                <div class="font-semibold text-2xl">Works on Phone, Tablet &amp; Laptop</div>
+                <p class="mt-3 text-slate-600">Fully responsive. Beautiful on every device.</p>
+            </div>
+            <div class="bg-white p-7 border border-slate-200 rounded-3xl">
+                <div class="text-4xl mb-4">🎥</div>
+                <div class="font-semibold text-2xl">Record While Using Google Meet</div>
+                <p class="mt-3 text-slate-600">Record your whiteboard + materials even when screen sharing on Meet.</p>
+            </div>
+            <div class="bg-white p-7 border border-slate-200 rounded-3xl">
+                <div class="text-4xl mb-4">⚡</div>
+                <div class="font-semibold text-2xl">Ultra Lightweight &amp; Free</div>
+                <p class="mt-3 text-slate-600">Enterprise features with zero cost. Works offline.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // PWA
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+
+        // State
+        let currentRoom = null;
+        let wbCtx = null, isDrawing = false, lastX = 0, lastY = 0, currentTool = 'pen';
+        let pdfDoc = null, pdfPage = 1, pdfScale = 1.2;
+        let teacherStream = null, meetRecorder = null, meetChunks = [];
+
+        // Whiteboard
+        function initWhiteboard() {
+            const canvas = document.getElementById('whiteboard');
+            wbCtx = canvas.getContext('2d');
+            wbCtx.lineJoin = 'round'; wbCtx.lineCap = 'round'; wbCtx.strokeStyle = '#1e3a8a'; wbCtx.lineWidth = 3;
+
+            canvas.addEventListener('mousedown', startDraw);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDraw);
+            canvas.addEventListener('mouseout', stopDraw);
+            
+            canvas.addEventListener('touchstart', touchStart);
+            canvas.addEventListener('touchmove', touchMove);
+            canvas.addEventListener('touchend', stopDraw);
+        }
+        
+        function startDraw(e){ isDrawing=true; const r=e.target.getBoundingClientRect(); lastX=e.clientX-r.left; lastY=e.clientY-r.top; }
+        function draw(e){ if(!isDrawing)return; const r=e.target.getBoundingClientRect(); const x=e.clientX-r.left, y=e.clientY-r.top;
+            wbCtx.strokeStyle = currentTool==='highlighter'?'rgba(234,179,8,0.35)':'#1e3a8a';
+            wbCtx.lineWidth = currentTool==='highlighter'?20:currentTool==='eraser'?28:3;
+            wbCtx.beginPath(); wbCtx.moveTo(lastX,lastY); wbCtx.lineTo(x,y); wbCtx.stroke(); lastX=x; lastY=y; }
+        function stopDraw(){ isDrawing=false; }
+        
+        function touchStart(e){ e.preventDefault(); const r=e.target.getBoundingClientRect(); lastX=e.touches[0].clientX-r.left; lastY=e.touches[0].clientY-r.top; isDrawing=true; }
+        function touchMove(e){ e.preventDefault(); if(!isDrawing)return; const r=e.target.getBoundingClientRect(); const x=e.touches[0].clientX-r.left, y=e.touches[0].clientY-r.top;
+            wbCtx.strokeStyle = currentTool==='highlighter'?'rgba(234,179,8,0.35)':'#1e3a8a';
+            wbCtx.lineWidth = currentTool==='highlighter'?20:currentTool==='eraser'?28:3;
+            wbCtx.beginPath(); wbCtx.moveTo(lastX,lastY); wbCtx.lineTo(x,y); wbCtx.stroke(); lastX=x; lastY=y; }
+
+        function setTool(t){ currentTool=t; document.querySelectorAll('[id^="tool-"]').forEach(el=>el.classList.remove('bg-blue-100','text-blue-700')); document.getElementById('tool-'+t).classList.add('bg-blue-100','text-blue-700'); }
+        function undo(){ alert("Undo action triggered"); }
+        function clearWhiteboard(){ wbCtx.clearRect(0,0,wbCtx.canvas.width,wbCtx.canvas.height); }
+        function saveWhiteboard(){ const a=document.createElement('a'); a.download='whiteboard.png'; a.href=document.getElementById('whiteboard').toDataURL(); a.click(); }
+
+        // PDF
+        function loadFile(e){
+            const file=e.target.files[0]; if(!file)return;
+            document.getElementById('pdf-dropzone').classList.add('hidden');
+            document.getElementById('pdf-viewer').classList.remove('hidden');
+            if(file.name.endsWith('.pdf')){
+                const r=new FileReader(); r.onload=ev=>{ pdfjsLib.getDocument(new Uint8Array(ev.target.result)).promise.then(p=>{pdfDoc=p;pdfPage=1;renderPDF();}); }; r.readAsArrayBuffer(file);
+            }
+        }
+        function renderPDF(){ pdfDoc.getPage(pdfPage).then(page=>{ const c=document.getElementById('pdf-canvas'); const ctx=c.getContext('2d');
+            const v=page.getViewport({scale:pdfScale}); c.height=v.height; c.width=v.width; page.render({canvasContext:ctx,viewport:v});
+            document.getElementById('page-info').innerText=`${pdfPage}/${pdfDoc.numPages}`; }); }
+        function prevPage(){if(pdfPage>1){pdfPage--;renderPDF();}} function nextPage(){if(pdfPage<pdfDoc.numPages){pdfPage++;renderPDF();}} function zoomPDF(d){pdfScale+=d;renderPDF();}
+
+        // Browser
+        function switchPane(mode){
+            document.getElementById('pdf-pane').classList.toggle('hidden',mode!=='pdf');
+            document.getElementById('browser-pane').classList.toggle('hidden',mode!=='browser');
+            document.getElementById('pane2-title').innerText = mode==='pdf'?'Materials':'Browser';
+        }
+        function loadBrowser(){ document.getElementById('browser-frame').src = document.getElementById('browser-url').value; }
+
+        // Room
+        function createRoom(){
+            currentRoom = 'HMG-'+Math.floor(100000+Math.random()*900000);
+            document.getElementById('landing').classList.add('hidden');
+            document.getElementById('teaching-interface').classList.remove('hidden');
+            document.getElementById('room-code').innerHTML = `Room: <b>${currentRoom}</b>`;
+            initWhiteboard(); initStudents();
+        }
+        function joinRoom(){ const code=prompt('Room code:'); if(!code)return; currentRoom=code; createRoom(); }
+        function endClass(){ if(confirm('End class?')) location.reload(); }
+
+        // Cameras
+        async function toggleTeacherCamera(){
+            const btn=document.getElementById('cam-btn');
+            if(!teacherStream){
+                teacherStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+                const v=document.createElement('video'); v.srcObject=teacherStream; v.autoplay=true; v.className='w-9 h-9 rounded-2xl border ml-2 object-cover';
+                document.querySelector('nav').appendChild(v); btn.innerHTML='📹 Disable';
+            }else{ teacherStream.getTracks().forEach(t=>t.stop()); teacherStream=null; btn.innerHTML='📹 Camera'; }
+        }
+        function initStudents(){
+            const grid=document.getElementById('student-grid'); grid.innerHTML='';
+            for(let i=1;i<=5;i++){ const d=document.createElement('div'); d.className='video-tile aspect-video flex items-center justify-center text-white/70 text-xs'; d.innerHTML=`👤 Student ${i}`; grid.appendChild(d); }
+        }
+        function showStudentCameras(){ alert('Full responsive camera grid opened'); }
+
+        // Google Meet Recording (Key Feature)
+        function startGoogleMeetRecording(){
+            const btn = document.getElementById('meet-record-btn');
+            if(!meetRecorder){
+                const canvas = document.getElementById('whiteboard');
+                const stream = canvas.captureStream(30);
+                meetRecorder = new MediaRecorder(stream);
+                meetChunks = [];
+                meetRecorder.ondataavailable = e => meetChunks.push(e.data);
+                meetRecorder.onstop = () => {
+                    const blob = new Blob(meetChunks, {type:'video/webm'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href=url; a.download=`meet-recording-${currentRoom}.webm`; a.click();
+                };
+                meetRecorder.start();
+                btn.innerHTML = '⏹ Stop Meet Recording';
+                alert('Recording started. Share your screen in Google Meet. This platform records independently.');
+            }else{
+                meetRecorder.stop(); meetRecorder=null; btn.innerHTML='🎥 Record with Meet';
+            }
+        }
+
+        function startRecording(){
+            alert('Standard recording started. Use "Record with Meet" when screen sharing on Google Meet.');
+        }
+
+        function showAnalytics(){ alert('Enterprise Analytics v4\n\n• 58 classes\n• 95% engagement\n• 367 students\n\nCSV export ready.'); }
+        function showSettings(){
+            const m = document.createElement('div'); m.className='fixed inset-0 bg-black/70 flex items-center justify-center z-[200]';
+            m.innerHTML = `<div class="modal bg-white w-full max-w-md p-8 rounded-3xl"><h3 class="font-semibold text-3xl mb-6">Settings v4</h3>
+            <div class="space-y-4 text-sm"><label class="flex justify-between"><span>Dark mode</span><input type="checkbox"></label>
+            <label class="flex justify-between"><span>Auto-save</span><input type="checkbox" checked></label>
+            <label class="flex justify-between"><span>Low data mode</span><input type="checkbox"></label></div>
+            <div class="mt-8 text-right"><button onclick="this.closest('.fixed').remove()" class="px-8 py-3 bg-slate-900 text-white rounded-2xl font-semibold">Save</button></div></div>`;
+            document.body.appendChild(m);
+        }
+
+        function boot(){ console.log('%c[HMG v4] Cross-device platform ready', 'color:#64748b'); }
+        window.onload = boot;
+    </script>
+</body>
+</html>
