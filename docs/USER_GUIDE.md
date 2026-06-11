@@ -1,18 +1,25 @@
-# 🎓 HMG ClassDeck v3 — Quick User Guide
+# 🎓 HMG ACADEMY CLASS DECK (v4) — Quick User Guide
 
 Print this or keep it open during your first classes.
 
 ---
 
-## FOR THE TEACHER — Mode 1: Google Meet (your main flow)
+## FOR THE TEACHER — Mode 1: Google Meet / Zoom / any conferencing app
 
-1. Open **Google Meet**, start your class, admit students.
-2. In Meet: **Share screen → Share entire screen → Start sharing**.
+1. Open **Google Meet, Zoom, Teams, Jitsi or WhatsApp video**, start your class, admit students.
+2. In the app: **Share screen → Share entire screen → Start sharing**.
 3. Press recent-apps and open **ClassDeck → Teach on Google Meet**
    (green badge appears; the call keeps running in the background).
 4. Left pane = ✏ Whiteboard, right pane = 📄 PDF (open today's material, or 📚
    load a prepared lesson deck).
-5. Tap **🎯 Focus** — all toolbars hide; this clean screen is what Meet shares.
+5. Tap **🎯 Focus** — all toolbars AND the browser address bar hide (true full
+   screen); this clean screen is what Meet/Zoom shares.
+   - Want students to see YOU? Tap **📷 Cam** — your face floats on screen
+     (drag it anywhere, tap it to resize) and rides along in the screen share.
+   - Want to see THEM? Tap **📺 See students** for three free ways (Meet/Zoom
+     PiP over this app, a second phone, or the ClassDeck hybrid camera grid).
+   - Recording here (⏺) **cannot** break the Meet/Zoom share — it uses its own
+     private pipeline.
    - Floating capsule (top-left): pen 🖍 highlighter 🧽 eraser 🔴 laser, ↩ undo,
      ‹ › board pages, ＋ new page, ◫ layout.
    - ☰ brings the full toolbars back; tap 🎯 again to re-hide.
@@ -63,6 +70,15 @@ and your boards are exactly where you left them (autosave).
 | Quick understanding check | 📊 → type question → Start poll |
 | Give a timed exercise | ⏱ → choose minutes |
 | Stop new people joining | 👥 → 🔒 Lock room |
+| Approve each student before entry | 👥 → 🚪 Waiting room (Admit / Admit all) |
+| Silence every student mic | 👥 → 🔇 Mute all |
+| Call on one student | double-tap their name in 👥 → 🌟 banner |
+| Zoom only the PDF (not the board) | pinch the PDF with 2 fingers |
+| Zoom the whiteboard | pinch it with 2 fingers; 1:1 to reset |
+| Write with stylus, pan with fingers | board toolbar → ✍ pen-only |
+| Fill shapes instead of outlines | board toolbar → 🪣 |
+| Plot a function | pane tab 📈 → type `x^2-3*x+2` → Plot |
+| Play an experiment clip | pane tab 🎬 → open local video |
 | Remove someone | 👥 → ✕ next to their name |
 | Run a scored quiz | 🏆 → type/load questions (* = correct) → Start |
 | See who's winning | 🏆 drawer → Leaderboard |
