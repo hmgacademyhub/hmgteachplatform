@@ -1,0 +1,25 @@
+{
+  "name": "HMG ClassDeck v3 — Split-Screen Teaching Studio",
+  "short_name": "ClassDeck",
+  "description": "Lightweight installable teaching platform: split-screen whiteboard + PDF/browser workspace with built-in live classroom (camera, chat, polls, attendance).",
+  "id": "/",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#10142b",
+  "theme_color": "#1e2a78",
+  "lang": "en",
+  "categories": ["education", "productivity"],
+  "icons": [
+    { "src": "assets/icon-96.png",  "sizes": "96x96",   "type": "image/png" },
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Teach on Google Meet", "url": "./teach.html?meet=1", "description": "Meet Companion: workspace for screen sharing on Meet" },
+    { "name": "Start a class",   "url": "./teach.html",            "description": "Open the teacher studio (built-in live class)" },
+    { "name": "Join a class",    "url": "./join.html",             "description": "Join as a student" },
+    { "name": "Solo workspace",  "url": "./teach.html?solo=1",     "description": "Whiteboard + PDF without a live class" }
+  ]
+}

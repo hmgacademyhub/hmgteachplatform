@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Join class — HMG ClassDeck</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="assets/icon-96.png" />
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+<meta name="theme-color" content="#1e2a78" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ===== join gate ===== -->
+<div class="join-gate" id="joinGate">
+  <div class="join-card">
+    <img src="assets/icon-192.png" alt="ClassDeck" />
+    <h2>Join your class</h2>
+    <p class="sub">No account needed. Works on any phone, tablet or laptop.</p>
+    <div>
+      <label style="font-size:13px;color:var(--text-dim)">Room code</label>
+      <input class="input" id="inRoom" placeholder="e.g. K7M2QX" autocapitalize="characters" maxlength="10" style="text-transform:uppercase;letter-spacing:2px;font-weight:700" />
+    </div>
+    <div>
+      <label style="font-size:13px;color:var(--text-dim)">Your name</label>
+      <input class="input" id="inName" placeholder="e.g. Chidinma O." maxlength="40" />
+    </div>
+    <div>
+      <label style="font-size:13px;color:var(--text-dim)">Class PIN (only if your teacher set one)</label>
+      <input class="input" id="inPin" placeholder="e.g. 2468" maxlength="8" inputmode="numeric" />
+    </div>
+    <button class="btn primary" id="btnJoin" style="padding:12px">Join class ➜</button>
+    <p class="sub" id="joinStatus"></p>
+  </div>
+</div>
+
+<!-- ===== live stage ===== -->
+<div class="stage-wrap hide" id="stageWrap">
+  <video id="stageVideo" autoplay playsinline></video>
+</div>
+
+<!-- teacher camera picture-in-picture (draggable) -->
+<div class="teacher-pip" id="teacherPip"><video id="teacherVideo" autoplay playsinline></video></div>
+
+<!-- status chips -->
+<div class="stage-status hide" id="stageStatus">
+  <span class="badge live">● LIVE</span>
+  <span class="badge" id="roomNameChip"></span>
+  <span class="badge" id="countChip">👥 1</span>
+</div>
+
+<!-- tap-to-unmute overlay (autoplay policy) -->
+<div class="modal-back" id="mUnmute">
+  <div class="modal" style="text-align:center">
+    <h3>🔊 Tap to start audio &amp; video</h3>
+    <p style="color:var(--text-dim);font-size:14px;margin-bottom:14px">Your browser requires one tap before sound can play.</p>
+    <button class="btn primary" id="btnUnmute" style="padding:14px 26px;font-size:16px">▶ Start class view</button>
+  </div>
+</div>
+
+<!-- student controls -->
+<div class="stu-controls hidden" id="stuControls">
+  <button class="btn icon" id="sBtnHand" title="Raise hand">✋</button>
+  <button class="btn icon" id="sBtnChat" title="Chat">💬</button>
+  <button class="btn icon" id="sBtnCam" title="My camera">📷</button>
+  <button class="btn icon" id="sBtnMic" title="My mic (teacher must allow)" disabled>🎙</button>
+  <button class="btn icon" id="sBtnFull" title="Fullscreen">⛶</button>
+  <button class="btn icon danger" id="sBtnLeave" title="Leave">🚪</button>
+</div>
+
+<!-- chat drawer -->
+<aside class="drawer" id="sDrawerChat" style="top:0">
+  <div class="drawer-head">💬 Class chat <button class="btn small ghost" id="sChatClose">✕</button></div>
+  <div class="drawer-body" id="sChatList"></div>
+  <div class="drawer-foot">
+    <div class="chat-input-row">
+      <input class="input" id="sChatInput" placeholder="Ask a question…" maxlength="500" />
+      <button class="btn primary" id="sChatSend">➤</button>
+    </div>
+  </div>
+</aside>
+
+<!-- v3: quiz modal -->
+<div class="modal-back" id="mQuiz">
+  <div class="modal">
+    <h3 id="sQuizTitle">🏆 Quiz</h3>
+    <p style="color:var(--text-dim);font-size:12.5px">Question <span id="sQuizPos">1/1</span> • answer fast for bonus points! <b id="sQuizTimer"></b></p>
+    <b id="sQuizQ" style="display:block;margin:10px 0;font-size:16px"></b>
+    <div id="sQuizOpts" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div id="sQuizFb" class="hide" style="margin-top:10px;font-weight:700;font-size:15px"></div>
+  </div>
+</div>
+
+<!-- poll modal -->
+<div class="modal-back" id="mPoll">
+  <div class="modal">
+    <h3>📊 Quick poll</h3>
+    <b id="sPollQ" style="display:block;margin-bottom:10px"></b>
+    <div id="sPollOpts" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
+<!-- announcement overlay -->
+<div class="modal-back" id="mAnnounce">
+  <div class="modal" style="text-align:center">
+    <h3>📢 Announcement</h3>
+    <p id="announceText" style="font-size:18px;line-height:1.5;margin:10px 0"></p>
+    <button class="btn primary" onclick="closeModal('#mAnnounce')">OK</button>
+  </div>
+</div>
+
+<script src="vendor/peerjs.min.js"></script>
+<script src="js/common.js"></script>
+<script src="js/rtc.js"></script>
+<script src="js/join.js"></script>
+</body>
+</html>

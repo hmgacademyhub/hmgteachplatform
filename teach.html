@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Teacher Studio — HMG ClassDeck v2</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="assets/icon-96.png" />
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+<meta name="theme-color" content="#1e2a78" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div class="studio">
+
+  <!-- ============ TOP BAR ============ -->
+  <header class="topbar">
+    <a class="brand" href="index.html" title="Home">
+      <img src="assets/icon-96.png" alt="" /> <span>ClassDeck</span>
+    </a>
+
+    <span id="liveBadge" class="badge hide">● LIVE</span>
+    <span id="timerChip" class="badge"><span>⏱</span><b id="timerVal">00:00</b></span>
+
+    <div class="roominfo" id="roomInfo" title="Tap to copy student link">
+      Room <code id="roomCodeLbl">——</code>
+      <span class="dot off" id="sigDot"></span>
+      <span id="stuCount">0 👥</span>
+    </div>
+
+    <button class="btn small" id="btnQR" title="Show join QR / link">🔗 Invite</button>
+
+    <div class="spacer"></div>
+
+    <button class="btn small primary" id="btnGoLive">▶ Go Live</button>
+    <button class="btn small danger hide" id="btnEndLive">⏹ End</button>
+    <button class="btn small" id="btnCam" title="Toggle your camera">📷 Cam</button>
+    <button class="btn small" id="btnMic" title="Toggle your microphone">🎙 Mic</button>
+    <button class="btn small" id="btnRec" title="Record the lesson locally">⏺ Rec</button>
+
+    <button class="btn small" id="btnStudents" title="Students / monitoring">👥</button>
+    <button class="btn small" id="btnChat" title="Class chat">💬</button>
+    <button class="btn small" id="btnPoll" title="Quick poll">📊</button>
+    <button class="btn small" id="btnQuiz" title="Quiz with auto-scoring &amp; leaderboard">🏆</button>
+    <button class="btn small" id="btnCalc" title="Floating calculator">🧮</button>
+    <button class="btn small" id="btnTimer" title="Countdown timer">⏱</button>
+
+    <button class="btn small" id="btnLayout" title="Cycle layout: split / left only / right only">◫</button>
+    <button class="btn small" id="btnSwap" title="Swap panes">⇄</button>
+    <button class="btn small" id="btnFocus" title="Focus mode — hide all bars (great while sharing on Google Meet)">🎯</button>
+    <button class="btn small" id="btnLessons" title="Lesson manager — save/load whiteboard decks">📚</button>
+    <button class="btn small" id="btnFull" title="Fullscreen">⛶</button>
+    <button class="btn small" id="btnSettings" title="Settings">⚙</button>
+  </header>
+
+  <!-- floating handle to exit focus mode -->
+  <button id="focusHandle" class="focus-handle hide" title="Show toolbar">☰</button>
+
+  <!-- ============ SPLIT WORKSPACE ============ -->
+  <div class="workspace" id="workspace">
+
+    <!-- LEFT PANE -->
+    <div class="pane" id="paneLeft">
+      <div class="pane-head" data-pane="L">
+        <span class="tab active" data-app="board">✏ Whiteboard</span>
+        <span class="tab" data-app="pdf">📄 PDF</span>
+        <span class="tab" data-app="web">🌐 Browser</span>
+        <span class="tab" data-app="notes">🗒 Notes</span>
+        <span class="tab" data-app="image">🖼 Image</span>
+      </div>
+      <div class="pane-body" id="bodyL"></div>
+    </div>
+
+    <div class="divider" id="divider" title="Drag to resize"></div>
+
+    <!-- RIGHT PANE -->
+    <div class="pane" id="paneRight">
+      <div class="pane-head" data-pane="R">
+        <span class="tab" data-app="board">✏ Whiteboard</span>
+        <span class="tab active" data-app="pdf">📄 PDF</span>
+        <span class="tab" data-app="web">🌐 Browser</span>
+        <span class="tab" data-app="notes">🗒 Notes</span>
+        <span class="tab" data-app="image">🖼 Image</span>
+      </div>
+      <div class="pane-body" id="bodyR"></div>
+    </div>
+  </div>
+
+  <!-- teacher self view -->
+  <div class="selfview" id="selfView"><video id="selfVideo" autoplay muted playsinline></video></div>
+</div>
+
+<!-- ============ APP TEMPLATES (cloned into panes) ============ -->
+<template id="tpl-board">
+  <section class="app-board active">
+    <div class="wb-toolbar">
+      <button class="tool active" data-tool="pen"      title="Pen">✏️</button>
+      <button class="tool" data-tool="highlight" title="Highlighter">🖍️</button>
+      <button class="tool" data-tool="eraser"    title="Eraser">🧽</button>
+      <button class="tool" data-tool="line"      title="Line">╱</button>
+      <button class="tool" data-tool="arrow"     title="Arrow">→</button>
+      <button class="tool" data-tool="rect"      title="Rectangle">▭</button>
+      <button class="tool" data-tool="ellipse"   title="Ellipse">◯</button>
+      <button class="tool" data-tool="text"      title="Text">T</button>
+      <button class="tool" data-tool="laser"     title="Laser pointer (fades, not saved)">🔴</button>
+      <span style="width:6px"></span>
+      <div class="wb-colors">
+        <span class="wb-color active" data-c="#111111" style="background:#111"></span>
+        <span class="wb-color" data-c="#e02b2b" style="background:#e02b2b"></span>
+        <span class="wb-color" data-c="#1565d8" style="background:#1565d8"></span>
+        <span class="wb-color" data-c="#0a8a3a" style="background:#0a8a3a"></span>
+        <span class="wb-color" data-c="#f59e0b" style="background:#f59e0b"></span>
+        <span class="wb-color" data-c="#8b5cf6" style="background:#8b5cf6"></span>
+      </div>
+      <input type="range" class="wb-size" min="1" max="14" value="3" title="Stroke size" style="width:80px" />
+      <span style="width:6px"></span>
+      <button class="tool wb-undo"  title="Undo">↩</button>
+      <button class="tool wb-redo"  title="Redo">↪</button>
+      <button class="tool wb-clear" title="Clear page">🗑</button>
+      <select class="input wb-bg" style="width:auto;padding:6px 8px" title="Background">
+        <option value="plain">Plain</option>
+        <option value="grid">Grid</option>
+        <option value="ruled">Ruled</option>
+        <option value="dark">Dark board</option>
+      </select>
+      <button class="tool wb-export" title="Export page as PNG">⬇</button>
+      <button class="tool wb-img" title="Insert image onto the board">🖼</button>
+      <input type="file" class="wb-imgfile hide" accept="image/*" />
+      <button class="tool wb-pdf" title="Export ALL pages as a PDF">🧾</button>
+    </div>
+    <div class="wb-stage"></div>
+    <div class="wb-pagebar">
+      <button class="wb-prev" title="Previous page">‹</button>
+      <span class="wb-pageinfo">1 / 1</span>
+      <button class="wb-next" title="Next page">›</button>
+      <button class="wb-add"  title="New page">＋</button>
+      <button class="wb-del"  title="Delete page">✕</button>
+    </div>
+  </section>
+</template>
+
+<template id="tpl-pdf">
+  <section class="app-pdf active">
+    <div class="pdf-bar">
+      <button class="btn small pdf-open">📂 Open PDF</button>
+      <input type="file" class="pdf-file hide" accept="application/pdf" />
+      <button class="btn small pdf-prev">‹</button>
+      <span class="pdf-info" style="font-size:13px">– / –</span>
+      <button class="btn small pdf-next">›</button>
+      <button class="btn small pdf-zoomout">−</button>
+      <span class="pdf-zoom" style="font-size:13px">100%</span>
+      <button class="btn small pdf-zoomin">＋</button>
+      <button class="btn small pdf-fit">Fit</button>
+      <input type="number" class="input pdf-goto" placeholder="pg" style="width:64px;padding:5px 8px" min="1" />
+      <button class="btn small pdf-annot" title="Draw on top of this PDF page">✏ Annotate</button>
+      <button class="btn small pdf-annot-clear hide" title="Clear annotations on this page">🧹</button>
+    </div>
+    <div class="pdf-scroll">
+      <div class="pdf-pagewrap" style="position:relative;margin:14px">
+        <canvas class="pdf-canvas" style="margin:0"></canvas>
+        <div class="pdf-annot-stage" style="position:absolute;inset:0;display:none"></div>
+      </div>
+    </div>
+    <div class="drop-hint pdf-hint">
+      <div class="em">📄</div>
+      <b>Open a PDF</b>
+      <span>Tap “Open PDF”, or drop a file here.<br/>Your file stays on this device — nothing is uploaded.</span>
+    </div>
+  </section>
+</template>
+
+<template id="tpl-web">
+  <section class="app-web active">
+    <div class="web-bar">
+      <button class="btn small web-back">‹</button>
+      <button class="btn small web-reload">⟳</button>
+      <input type="text" class="input web-url" placeholder="Type a URL, e.g. en.wikipedia.org" />
+      <button class="btn small primary web-go">Go</button>
+      <button class="btn small web-pop" title="Open in a real browser tab">↗</button>
+    </div>
+    <div class="quick-links">
+      <button class="btn small ghost web-quick" data-u="https://en.wikipedia.org">Wikipedia</button>
+      <button class="btn small ghost web-quick" data-u="https://www.openstreetmap.org/export/embed.html">Map</button>
+      <button class="btn small ghost web-quick" data-u="https://www.desmos.com/calculator">Desmos</button>
+      <button class="btn small ghost web-quick" data-u="https://www.geogebra.org/calculator">GeoGebra</button>
+      <button class="btn small ghost web-quick" data-u="https://archive.org">Archive.org</button>
+    </div>
+    <iframe class="web-frame" id="webFrame" style="flex:1;border:none;background:#fff" referrerpolicy="no-referrer"></iframe>
+    <div class="web-note">⚠ Some sites (Google, YouTube watch pages…) block embedding. If a page stays blank, use ↗ to open it in a browser tab, or use a site from the quick links. The embedded browser is <b>not</b> visible in the composite broadcast — students see a placeholder unless you use “Share screen” mode.</div>
+  </section>
+</template>
+
+<template id="tpl-notes">
+  <section class="app-notes active">
+    <div class="pdf-bar">
+      <button class="btn small notes-save">💾 Save .txt</button>
+      <button class="btn small notes-clear">🗑 Clear</button>
+      <span style="font-size:12px;color:var(--text-dim)">Auto-saves on this device</span>
+    </div>
+    <textarea class="notes-area" id="notesArea" placeholder="Lesson notes… visible to students when this pane is broadcast."></textarea>
+  </section>
+</template>
+
+<template id="tpl-image">
+  <section class="app-image active">
+    <div class="pdf-bar">
+      <button class="btn small img-open">🖼 Open image</button>
+      <input type="file" class="img-file hide" accept="image/*" />
+    </div>
+    <div class="img-scroll"><img class="img-view" alt="" /></div>
+    <div class="drop-hint img-hint"><div class="em">🖼</div><b>Open an image</b><span>Diagrams, charts, screenshots…</span></div>
+  </section>
+</template>
+
+<!-- ============ DRAWERS ============ -->
+<aside class="drawer" id="drawerStudents">
+  <div class="drawer-head">👥 Students <button class="btn small ghost drawer-close">✕</button></div>
+  <div class="drawer-body">
+    <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn small" id="btnLock">🔒 Lock room</button>
+      <button class="btn small" id="btnAttendance">📋 Attendance CSV</button>
+      <button class="btn small" id="btnAskAllCams">📷 Ask all cams</button>
+      <button class="btn small" id="btnReport">📈 Class report</button>
+    </div>
+    <hr class="sep" />
+    <div id="rosterList"><p style="color:var(--text-dim);font-size:13px">No students yet. Share the room link.</p></div>
+    <hr class="sep" />
+    <b style="font-size:13px">Student cameras</b>
+    <div class="cam-grid" id="camGrid"></div>
+  </div>
+</aside>
+
+<aside class="drawer" id="drawerChat">
+  <div class="drawer-head">💬 Class chat <button class="btn small ghost drawer-close">✕</button></div>
+  <div class="drawer-body" id="chatList"></div>
+  <div class="drawer-foot">
+    <div class="chat-input-row">
+      <input class="input" id="chatInput" placeholder="Message the class…" maxlength="500" />
+      <button class="btn primary" id="chatSend">➤</button>
+    </div>
+    <button class="btn small ghost" id="btnAnnounce" style="margin-top:8px">📢 Send full-screen announcement</button>
+  </div>
+</aside>
+
+<aside class="drawer" id="drawerQuiz">
+  <div class="drawer-head">🏆 Quiz &amp; leaderboard <button class="btn small ghost drawer-close">✕</button></div>
+  <div class="drawer-body">
+    <div id="quizSetup">
+      <label>Quiz title</label>
+      <input class="input" id="quizTitle" placeholder="e.g. Quadratics check" />
+      <label style="margin-top:8px">Seconds per question</label>
+      <input class="input" id="quizSecs" type="number" value="30" min="5" max="300" style="width:110px" />
+      <label style="margin-top:8px">Questions</label>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:6px">
+        Format — one block per question, blank line between blocks:<br/>
+        line 1 = the question · following lines = options · put <b>*</b> before the correct option.
+      </p>
+      <textarea class="input" id="quizText" rows="9" placeholder="What is 54 ÷ 6?
+*9
+8
+7
+
+Solve x+2=5
+2
+*3
+4"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn primary" id="quizStart">Start quiz</button>
+        <button class="btn small" id="quizSaveBank" title="Save these questions on this device">💾 Save bank</button>
+        <select class="input" id="quizBankSel" style="width:auto"><option value="">Load saved…</option></select>
+      </div>
+    </div>
+    <div id="quizLive" class="hide">
+      <b id="quizLiveTitle"></b>
+      <p id="quizLiveQ" style="margin:6px 0;font-size:14px"></p>
+      <p style="font-size:13px;color:var(--text-dim)"><span id="quizAnswered">0</span> answered • Q <span id="quizPos">1/1</span></p>
+      <div id="quizTally" style="margin:8px 0"></div>
+      <div class="row">
+        <button class="btn primary" id="quizNext">Next question ➜</button>
+        <button class="btn danger" id="quizEnd">End quiz</button>
+      </div>
+    </div>
+    <hr class="sep" />
+    <b style="font-size:13px">Leaderboard (this class)</b>
+    <div id="leaderList" style="display:flex;flex-direction:column;gap:6px"></div>
+    <button class="btn small" id="scoreReset">↺ Reset all scores</button>
+  </div>
+</aside>
+
+<aside class="drawer" id="drawerPoll">
+  <div class="drawer-head">📊 Quick poll <button class="btn small ghost drawer-close">✕</button></div>
+  <div class="drawer-body">
+    <div id="pollSetup">
+      <label>Question</label>
+      <input class="input" id="pollQ" placeholder="e.g. Did you understand this step?" />
+      <label style="margin-top:8px">Options (one per line, 2–6)</label>
+      <textarea class="input" id="pollOpts" rows="4">Yes
+No
+Not sure</textarea>
+      <button class="btn primary" id="pollStart" style="margin-top:10px">Start poll</button>
+    </div>
+    <div id="pollLive" class="hide">
+      <b id="pollLiveQ"></b>
+      <div id="pollLiveBars" style="margin-top:8px"></div>
+      <button class="btn danger" id="pollEnd" style="margin-top:10px">End poll &amp; show results</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ============ MODALS ============ -->
+<div class="modal-back" id="mInvite">
+  <div class="modal">
+    <h3>🔗 Invite students</h3>
+    <p style="color:var(--text-dim);font-size:13.5px">Students open this link (or scan the QR) in any browser — phone, tablet or laptop. No app, no account.</p>
+    <div class="row"><input class="input" id="inviteLink" readonly /><button class="btn primary" id="copyLink">Copy</button></div>
+    <div id="qrBox" style="background:#fff;padding:14px;border-radius:12px;width:fit-content;margin:12px auto"></div>
+    <p style="text-align:center;font-size:14px">Room code: <code id="inviteCode" style="color:var(--accent);font-size:20px;font-weight:700"></code></p>
+  </div>
+</div>
+
+<div class="modal-back" id="mSettings">
+  <div class="modal">
+    <h3>⚙ Settings</h3>
+    <label>Your display name</label>
+    <input class="input" id="setName" placeholder="e.g. Mr Adewale (HMG Academy)" />
+    <label style="margin-top:10px">Class / room name (students see this)</label>
+    <input class="input" id="setRoomName" placeholder="e.g. SS2 Mathematics — Simultaneous Equations" />
+    <label style="margin-top:10px">Broadcast mode</label>
+    <select class="input" id="setBroadcast">
+      <option value="composite">Composite (recommended on tablets) — streams whiteboard/PDF/notes/image panes</option>
+      <option value="screen">Share screen (laptops / where supported) — streams everything incl. browser</option>
+    </select>
+    <label style="margin-top:10px">Broadcast quality</label>
+    <select class="input" id="setQuality">
+      <option value="1280x720x8">720p @ 8 fps — best for slow networks (default)</option>
+      <option value="1280x720x15">720p @ 15 fps</option>
+      <option value="1920x1080x10">1080p @ 10 fps — strong network only</option>
+    </select>
+    <div class="row" style="margin-top:10px">
+      <label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="setWake" checked /> Keep screen awake during class</label>
+    </div>
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="setNewRoom" /> Generate a new room code next time</label>
+    </div>
+    <hr class="sep" />
+    <label>🔑 Class PIN (optional — students must enter it to join; leave empty for none)</label>
+    <input class="input" id="setPin" placeholder="e.g. 2468" maxlength="8" inputmode="numeric" />
+    <hr class="sep" />
+    <label>🎨 Branding — academy name (shows on the broadcast watermark &amp; student welcome)</label>
+    <input class="input" id="setBrand" placeholder="e.g. HMG Academy" />
+    <label style="margin-top:8px">Accent colour</label>
+    <div class="row">
+      <input type="color" id="setAccent" value="#ffb347" style="width:48px;height:36px;border:none;background:none;cursor:pointer" />
+      <button class="btn small" id="setAccentReset">Reset colour</button>
+    </div>
+    <hr class="sep" />
+    <label>💾 Backup &amp; restore (settings, lessons, notes, boards — one file)</label>
+    <div class="row">
+      <button class="btn small" id="setBackup">⬇ Backup everything</button>
+      <button class="btn small" id="setRestoreBtn">⬆ Restore from file</button>
+      <input type="file" id="setRestoreFile" class="hide" accept="application/json" />
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn primary" id="setSave">Save</button>
+      <button class="btn install-btn hide" onclick="promptInstall()">⬇ Install app</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="mLessons">
+  <div class="modal">
+    <h3>📚 Lesson manager</h3>
+    <p style="color:var(--text-dim);font-size:13px">Save the current whiteboard deck (all pages) under a lesson name, and reload it any time — e.g. prepare boards before class. Stored on this device; use Export/Import to move between devices.</p>
+    <div class="row">
+      <input class="input" id="lessonName" placeholder="Lesson name, e.g. SS2 Quadratics — Week 3" style="flex:1" />
+      <button class="btn primary" id="lessonSave">💾 Save</button>
+    </div>
+    <div id="lessonList" style="display:flex;flex-direction:column;gap:8px;margin-top:10px"></div>
+    <hr class="sep" />
+    <div class="row">
+      <button class="btn small" id="lessonExport">⬇ Export current deck (.json)</button>
+      <button class="btn small" id="lessonImportBtn">⬆ Import deck (.json)</button>
+      <input type="file" id="lessonImportFile" class="hide" accept="application/json" />
+    </div>
+  </div>
+</div>
+
+<!-- v3: floating calculator -->
+<div id="calcBox" class="calc-box hide">
+  <div class="calc-head" id="calcDrag">🧮 Calculator <button class="btn small ghost" id="calcClose">✕</button></div>
+  <input class="input calc-display" id="calcDisplay" readonly value="0" />
+  <div class="calc-grid" id="calcKeys"></div>
+</div>
+
+<!-- v3: class report modal -->
+<div class="modal-back" id="mReport">
+  <div class="modal">
+    <h3>📈 Class report</h3>
+    <div id="reportBody" style="font-size:14px;line-height:1.7"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary" id="reportDownload">⬇ Download report (.txt)</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="mTimer">
+  <div class="modal">
+    <h3>⏱ Countdown timer</h3>
+    <p style="color:var(--text-dim);font-size:13px">Great for exercises: “You have 5 minutes for question 3.”</p>
+    <div class="row">
+      <button class="btn" data-min="1">1 min</button>
+      <button class="btn" data-min="2">2 min</button>
+      <button class="btn" data-min="5">5 min</button>
+      <button class="btn" data-min="10">10 min</button>
+      <input class="input" id="timerCustom" type="number" placeholder="mins" style="width:90px" min="1" />
+      <button class="btn primary" id="timerStartCustom">Start</button>
+    </div>
+    <button class="btn danger" id="timerStop" style="margin-top:6px">Stop timer</button>
+  </div>
+</div>
+
+<script src="vendor/peerjs.min.js"></script>
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/qrcode.min.js"></script>
+<script src="js/common.js"></script>
+<script src="js/whiteboard.js"></script>
+<script src="js/rtc.js"></script>
+<script src="js/teach.js"></script>
+</body>
+</html>
