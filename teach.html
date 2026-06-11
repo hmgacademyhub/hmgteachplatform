@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Teacher Studio — HMG ClassDeck v2</title>
+<title>Teacher Studio — HMG ACADEMY CLASS DECK</title>
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="assets/icon-96.png" />
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
@@ -16,7 +16,7 @@
   <!-- ============ TOP BAR ============ -->
   <header class="topbar">
     <a class="brand" href="index.html" title="Home">
-      <img src="assets/icon-96.png" alt="" /> <span>ClassDeck</span>
+      <img src="assets/icon-96.png" alt="" /> <span>HMG&nbsp;ACADEMY&nbsp;CLASS&nbsp;DECK</span>
     </a>
 
     <span id="liveBadge" class="badge hide">● LIVE</span>
@@ -67,6 +67,8 @@
         <span class="tab" data-app="web">🌐 Browser</span>
         <span class="tab" data-app="notes">🗒 Notes</span>
         <span class="tab" data-app="image">🖼 Image</span>
+        <span class="tab" data-app="graph">📈 Graph</span>
+        <span class="tab" data-app="video">🎬 Video</span>
       </div>
       <div class="pane-body" id="bodyL"></div>
     </div>
@@ -81,6 +83,8 @@
         <span class="tab" data-app="web">🌐 Browser</span>
         <span class="tab" data-app="notes">🗒 Notes</span>
         <span class="tab" data-app="image">🖼 Image</span>
+        <span class="tab" data-app="graph">📈 Graph</span>
+        <span class="tab" data-app="video">🎬 Video</span>
       </div>
       <div class="pane-body" id="bodyR"></div>
     </div>
@@ -101,6 +105,10 @@
       <button class="tool" data-tool="arrow"     title="Arrow">→</button>
       <button class="tool" data-tool="rect"      title="Rectangle">▭</button>
       <button class="tool" data-tool="ellipse"   title="Ellipse">◯</button>
+      <button class="tool" data-tool="triangle"  title="Triangle">△</button>
+      <button class="tool" data-tool="diamond"   title="Diamond">◇</button>
+      <button class="tool" data-tool="star"      title="Star">☆</button>
+      <button class="tool wb-fill" title="Fill shapes on/off">🪣</button>
       <button class="tool" data-tool="text"      title="Text">T</button>
       <button class="tool" data-tool="laser"     title="Laser pointer (fades, not saved)">🔴</button>
       <span style="width:6px"></span>
@@ -127,6 +135,9 @@
       <button class="tool wb-img" title="Insert image onto the board">🖼</button>
       <input type="file" class="wb-imgfile hide" accept="image/*" />
       <button class="tool wb-pdf" title="Export ALL pages as a PDF">🧾</button>
+      <button class="tool wb-penonly" title="Pen-only mode: stylus draws, finger pans (palm rejection)">✍</button>
+      <button class="tool wb-zoomreset" title="Reset zoom (pinch with 2 fingers to zoom this board only)">1:1</button>
+      <span class="wb-zoomlbl" style="font-size:11.5px;color:var(--text-dim);flex:0 0 auto">100%</span>
     </div>
     <div class="wb-stage"></div>
     <div class="wb-pagebar">
@@ -201,6 +212,40 @@
   </section>
 </template>
 
+<template id="tpl-graph">
+  <section class="app-graph active">
+    <div class="pdf-bar">
+      <span style="font-size:13px;flex:0 0 auto">y =</span>
+      <input type="text" class="input gr-fx" placeholder="e.g. x^2 - 3*x + 2   (use ^ for power, sin, cos, tan, sqrt, log, abs)" style="flex:1;min-width:120px" />
+      <button class="btn small primary gr-plot">Plot</button>
+      <button class="btn small gr-add" title="Add as second curve">+ curve</button>
+      <button class="btn small gr-clear">Clear</button>
+      <button class="btn small gr-zo">−</button>
+      <button class="btn small gr-zi">＋</button>
+    </div>
+    <div class="gr-stage" style="flex:1;position:relative;background:#fff;touch-action:none">
+      <canvas class="gr-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+    </div>
+  </section>
+</template>
+
+<template id="tpl-video">
+  <section class="app-video active">
+    <div class="pdf-bar">
+      <button class="btn small vid-open">🎬 Open video/audio</button>
+      <input type="file" class="vid-file hide" accept="video/*,audio/*" />
+      <button class="btn small vid-slow" title="Slower">🐢</button>
+      <span class="vid-rate" style="font-size:12.5px">1.0×</span>
+      <button class="btn small vid-fastr" title="Faster">🐇</button>
+      <span style="font-size:11.5px;color:var(--text-dim)">Local files only — nothing uploads</span>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;background:#000;position:relative">
+      <video class="vid-el" controls playsinline style="max-width:100%;max-height:100%"></video>
+      <div class="drop-hint vid-hint"><div class="em">🎬</div><b>Open a video or audio file</b><span>Experiment clips, pronunciation audio, recorded examples…</span></div>
+    </div>
+  </section>
+</template>
+
 <template id="tpl-image">
   <section class="app-image active">
     <div class="pdf-bar">
@@ -218,11 +263,14 @@
   <div class="drawer-body">
     <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn small" id="btnLock">🔒 Lock room</button>
+      <button class="btn small" id="btnWaiting" title="Zoom-style waiting room: you admit each student">🚪 Waiting room</button>
+      <button class="btn small" id="btnMuteAll" title="Revoke every student's mic at once">🔇 Mute all</button>
       <button class="btn small" id="btnAttendance">📋 Attendance CSV</button>
       <button class="btn small" id="btnAskAllCams">📷 Ask all cams</button>
       <button class="btn small" id="btnReport">📈 Class report</button>
     </div>
     <hr class="sep" />
+    <div id="waitingList"></div>
     <div id="rosterList"><p style="color:var(--text-dim);font-size:13px">No students yet. Share the room link.</p></div>
     <hr class="sep" />
     <b style="font-size:13px">Student cameras</b>
@@ -311,10 +359,16 @@ Not sure</textarea>
 <div class="modal-back" id="mInvite">
   <div class="modal">
     <h3>🔗 Invite students</h3>
-    <p style="color:var(--text-dim);font-size:13.5px">Students open this link (or scan the QR) in any browser — phone, tablet or laptop. No app, no account.</p>
+    <div id="inviteLiveWarn" style="background:#3a2626;border:1px solid var(--danger);border-radius:10px;padding:10px;font-size:13.5px;margin-bottom:10px">
+      ⚠ <b>You are not LIVE yet.</b> Students can only join AFTER you tap <b>▶ Go Live</b>.
+      Order: 1) Go Live → 2) send this link → 3) students join.
+    </div>
+    <p style="color:var(--text-dim);font-size:13.5px">Students open this link (or scan the QR) in any browser — phone, tablet or laptop. No app, no account. The link only works on your <b>deployed https:// address</b> (not on a file opened from your device).</p>
     <div class="row"><input class="input" id="inviteLink" readonly /><button class="btn primary" id="copyLink">Copy</button></div>
     <div id="qrBox" style="background:#fff;padding:14px;border-radius:12px;width:fit-content;margin:12px auto"></div>
-    <p style="text-align:center;font-size:14px">Room code: <code id="inviteCode" style="color:var(--accent);font-size:20px;font-weight:700"></code></p>
+    <p style="text-align:center;font-size:14px">Room code: <code id="inviteCode" style="color:var(--accent);font-size:20px;font-weight:700"></code>
+      <span id="invitePin" style="display:block;font-size:13px;color:var(--text-dim)"></span></p>
+    <p style="font-size:12.5px;color:var(--text-dim)">🔑 To require a PIN: <b>⚙ Settings → Class PIN</b>. Students then type it on the join screen.</p>
   </div>
 </div>
 
@@ -385,11 +439,34 @@ Not sure</textarea>
   </div>
 </div>
 
-<!-- v3: floating calculator -->
+<!-- v4: full scientific calculator -->
 <div id="calcBox" class="calc-box hide">
-  <div class="calc-head" id="calcDrag">🧮 Calculator <button class="btn small ghost" id="calcClose">✕</button></div>
+  <div class="calc-head" id="calcDrag">🧮 Scientific calculator
+    <span>
+      <button class="btn small ghost" id="calcDeg" title="Angle unit">DEG</button>
+      <button class="btn small ghost" id="calcClose">✕</button>
+    </span>
+  </div>
+  <div class="calc-hist" id="calcHist"></div>
   <input class="input calc-display" id="calcDisplay" readonly value="0" />
-  <div class="calc-grid" id="calcKeys"></div>
+  <div class="calc-grid sci" id="calcKeys"></div>
+</div>
+
+<!-- v4: how to see student cameras in Meet/Zoom companion mode -->
+<div class="modal-back" id="mMeetPip">
+  <div class="modal">
+    <h3>📺 Seeing your students while teaching here</h3>
+    <p style="font-size:14px;line-height:1.7;color:var(--text-dim)">
+      While Google Meet / Zoom shares your screen, you have <b>three free ways</b> to keep an eye on students:
+    </p>
+    <ol style="font-size:14px;line-height:1.8;margin:10px 0 10px 20px">
+      <li><b>Meet picture-in-picture:</b> in Google Meet (Android), tap <b>Home</b> while in the call — Meet shrinks to a floating window showing participants <i>on top of</i> this app. Drag it to a corner. (Zoom: enable <i>Settings → Meeting → Show my video in PiP</i>.)</li>
+      <li><b>Split second device:</b> join the Meet/Zoom call muted on your phone and lay it beside the tablet as a dedicated "student monitor".</li>
+      <li><b>ClassDeck hybrid:</b> have students ALSO open your ClassDeck room link (no audio needed) and share their cameras here — open the 👥 drawer to see the camera grid while Meet handles audio/screen.</li>
+    </ol>
+    <p style="font-size:13px;color:var(--text-dim)">Tip: your own camera → tap <b>📷 Cam</b>. Your face appears in a floating window on this screen, so it is included in the screen share and students see you. Drag it anywhere; tap it to cycle size.</p>
+    <button class="btn primary" onclick="closeModal('#mMeetPip')">Got it</button>
+  </div>
 </div>
 
 <!-- v3: class report modal -->

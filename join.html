@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Join class — HMG ClassDeck</title>
+<title>Join class — HMG ACADEMY CLASS DECK</title>
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="assets/icon-96.png" />
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
@@ -15,9 +15,12 @@
 <!-- ===== join gate ===== -->
 <div class="join-gate" id="joinGate">
   <div class="join-card">
-    <img src="assets/icon-192.png" alt="ClassDeck" />
-    <h2>Join your class</h2>
-    <p class="sub">No account needed. Works on any phone, tablet or laptop.</p>
+    <img src="assets/icon-192.png" alt="HMG Academy Class Deck" />
+    <h2>HMG ACADEMY CLASS DECK</h2>
+    <p class="sub">Join your class — no account needed. Works on any phone, tablet or laptop.</p>
+    <p class="sub" style="background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:8px;font-size:12px">
+      ℹ The teacher must be <b>LIVE</b> (▶ Go Live pressed on their side) before you can join.
+      If it says "class not found", wait for your teacher to start, then tap Join again.</p>
     <div>
       <label style="font-size:13px;color:var(--text-dim)">Room code</label>
       <input class="input" id="inRoom" placeholder="e.g. K7M2QX" autocapitalize="characters" maxlength="10" style="text-transform:uppercase;letter-spacing:2px;font-weight:700" />
@@ -62,6 +65,7 @@
 <!-- student controls -->
 <div class="stu-controls hidden" id="stuControls">
   <button class="btn icon" id="sBtnHand" title="Raise hand">✋</button>
+  <button class="btn icon" id="sBtnReact" title="Send a reaction">😀</button>
   <button class="btn icon" id="sBtnChat" title="Chat">💬</button>
   <button class="btn icon" id="sBtnCam" title="My camera">📷</button>
   <button class="btn icon" id="sBtnMic" title="My mic (teacher must allow)" disabled>🎙</button>
@@ -80,6 +84,25 @@
     </div>
   </div>
 </aside>
+
+<!-- v4: reaction picker -->
+<div id="reactBar" class="hide" style="position:fixed;bottom:74px;left:50%;transform:translateX(-50%);z-index:60;display:flex;gap:6px;background:rgba(16,20,43,.92);border:1px solid var(--line);border-radius:999px;padding:8px 12px">
+  <button class="btn icon ghost react-emo">👍</button>
+  <button class="btn icon ghost react-emo">❤️</button>
+  <button class="btn icon ghost react-emo">😂</button>
+  <button class="btn icon ghost react-emo">🎉</button>
+  <button class="btn icon ghost react-emo">😮</button>
+  <button class="btn icon ghost react-emo">👏</button>
+</div>
+
+<!-- v4: waiting room overlay -->
+<div class="modal-back" id="mWaiting">
+  <div class="modal" style="text-align:center">
+    <h3>🚪 Waiting room</h3>
+    <p style="color:var(--text-dim);font-size:14px;margin:10px 0">You're in the waiting room.<br/>Your teacher will admit you shortly — please stay on this page.</p>
+    <div class="badge live" style="display:inline-block">waiting…</div>
+  </div>
+</div>
 
 <!-- v3: quiz modal -->
 <div class="modal-back" id="mQuiz">

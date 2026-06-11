@@ -1,4 +1,4 @@
-# HMG ClassDeck v3 — Split-Screen Teaching Studio 🧑‍🏫
+# HMG ACADEMY CLASS DECK (v4) — Split-Screen Teaching Studio 🧑‍🏫
 
 A **free, lightweight, installable (PWA) teaching platform** built for teachers who
 teach from a tablet (e.g. itel Vista Tab 30s) and were being thrown out of
@@ -58,7 +58,34 @@ nothing for Android to kill.
 
 ---
 
-# 🆕🆕 What's new in v3 (everything from v1 + v2 is still here)
+# 🆕🆕🆕 What's new in v4 (everything from v1 + v2 + v3 is still here)
+
+v4 directly answers ten field-tested issues. Feature-by-feature:
+
+| # | Feature | Detailed explanation |
+|---|---------|----------------------|
+| 1 | **🤏 Per-pane pinch zoom** | Every content pane now zooms **independently** with a two-finger pinch — zooming the PDF never touches the whiteboard beside it, and vice-versa. • **PDF:** two fingers pinch re-renders the page sharply at the new scale (0.3×–5×); one finger still scrolls. • **Whiteboard:** two fingers pinch-zooms (1×–6×) and pans the board view; ink thickness scales correctly; a live % label shows the zoom and **1:1** resets it; exports/broadcast always use the un-zoomed board. • **Image & Graph panes:** same two-finger gesture. |
+| 2 | **🖥 Focus mode hides the browser bars too** | Tapping **🎯 Focus** now ALSO requests browser fullscreen, which removes Chrome's address bar and title bar — the two panes occupy the **entire physical screen**. Exiting (☰, Esc, or Android Back) restores everything. Best of all: when installed as a PWA from the home screen there is no address bar to begin with. |
+| 3 | **🖥 ⛶ Fullscreen hides the platform menu too** | The ⛶ button is now "fullscreen = focus": one tap hides the platform's own top menu, the pane tabs, all toolbars AND the browser chrome together. The floating ☰ handle and mini tool capsule remain so you keep teaching. |
+| 4 | **🔧 Join troubleshooting + visible PIN setting** | The Invite dialog now shows a **red warning when you are not yet LIVE** (the #1 reason students "can't join" — you must tap ▶ Go Live *before* they use the link), shows where the **Class PIN** lives (⚙ Settings → Class PIN) and displays the current PIN. It also warns if you're running from a `file://` path instead of your deployed https:// site (the second most common cause). The student join page explains the teacher must be live. Cameras both ways were already built in: students tap 📷 to share theirs (grid in your 👥 drawer), you tap 📷 Cam so they see you. See the **Troubleshooting** section below for the full checklist. |
+| 5 | **🧮 Full scientific calculator** | Upgraded to a complete scientific calculator: trig (sin/cos/tan) with **inverse functions via 2nd**, **DEG/RAD** toggle, ln, log₁₀, eˣ, 10ˣ, xʸ, x², x³, √, ∛, n! (factorial), 1/x, ± , EXP (×10ⁿ), π, e, **Ans** (last answer), memory **M+ / M− / MR / MC**, and a **history tape** of recent calculations. Still draggable and visible inside broadcasts/screen shares. |
+| 6 | **🤝 Zoom/Meet feature parity + app-agnostic companion** | New classroom features modeled on Zoom/Meet: **🚪 Waiting room** (students are held until you Admit/Deny — Admit-all button), **😀 emoji reactions** (👍 ❤ 😂 🎉 😮 👏 float up everyone's screens with the sender's name), **🔇 Mute all**, **🌟 Spotlight** (double-tap a name in the roster — every student sees "🌟 Name, it's your turn!"). And the companion mode is **app-agnostic**: the platform never cares which conferencing app shares the screen — Google Meet, Zoom, MS Teams, Jitsi or WhatsApp video all work identically (start call → share screen → switch to Class Deck). |
+| 7 | **📈🎬 Two new pane apps** | Beyond whiteboard/PDF/browser/notes/image: • **📈 Graph plotter** — an offline Desmos-style function grapher: type `x^2-3*x+2`, `sin(x)`, `sqrt(x)`… plot **multiple coloured curves**, drag to pan, pinch or ± to zoom, automatic grid and axis labels; fully included in the composite broadcast (great for mathematics!). • **🎬 Video/audio player** — open local video or audio files (experiment clips, pronunciation recordings) with **0.25×–3× playback speed**; the picture is composited into the broadcast. |
+| 8 | **🎥 Conflict-free recording** | The ⏺ recorder was re-architected: it now records from a **private composite-canvas stream + your microphone only**, and **never calls the screen-capture API**. Android only allows ONE screen capture at a time — that one now always belongs to Meet/Zoom. Result: you can screen-share on Meet/Zoom and record the lesson in Class Deck **simultaneously with zero conflict**. |
+| 9 | **📷 Cameras in companion mode** | The **📷 Cam** button now stays available in companion mode. Toggling it shows your face in a **draggable, tap-to-resize** floating window (3 sizes) — and since Meet/Zoom is sharing your whole screen, **students automatically see you** through the share. For seeing *their* cameras, the new **📺 See students** button explains three free options: ① Meet/Zoom picture-in-picture floating over Class Deck (tap Home during the call), ② a second phone as a dedicated monitor, ③ the hybrid trick — students also open your Class Deck room and share cameras there (👥 grid) while Meet carries the audio. |
+| 10 | **✏ Whiteboard power-up** | Already had pen/highlighter/eraser/line/arrow/rect/ellipse/text/laser, 6 colours, sizes, multi-page, undo/redo, grid/ruled/dark papers, autosave, PNG/PDF export, image stamps. v4 adds: **△ triangle, ◇ diamond, ☆ star** shapes, **🪣 filled-or-outlined** toggle for all shapes, **pinch zoom & pan**, and **✍ pen-only mode (palm rejection)** — by default writing **with your finger works perfectly** (finger = ink); flip on ✍ when you use your stylus so your resting palm/fingers pan instead of scribbling. |
+
+### 🔧 Troubleshooting: "my student cannot join" (issue 4 checklist)
+1. **Are you LIVE?** Students can only connect AFTER you tap **▶ Go Live** (the invite dialog warns you now). Order: Go Live → send link → they join.
+2. **Are you on the deployed site?** The link must point to your `https://…pages.dev` address. If you open the app from a local file, the link you copy is useless to students.
+3. **Same room code?** The link auto-fills it; if typing manually, note the code has no 0/O/1/I letters.
+4. **PIN mismatch?** If you set a PIN (⚙ Settings → Class PIN), students must type exactly that PIN on the join screen. The invite dialog now displays the active PIN.
+5. **Both online?** The first connection brokered via the free PeerJS cloud needs internet on both sides; afterwards media is direct peer-to-peer.
+6. **Strict school/corporate Wi-Fi?** Rarely, a firewall blocks WebRTC. The built-in free TURN relay usually solves it; switching the student to mobile data confirms the diagnosis.
+
+---
+
+# 🆕🆕 What was new in v3 (still here)
 
 | Feature | Detailed explanation |
 |---|---|
