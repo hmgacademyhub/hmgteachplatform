@@ -41,6 +41,8 @@ class TeacherRoom {
     this.activePoll = null;
     this.peer = null;
     this.locked = false;
+    this.waitingRoom = false;                         // v4: Zoom-style waiting room
+    this.pending = new Map();                         // v4: peers awaiting admission
     this.pin = "";                                    // v3: optional room PIN
     this.activeQuiz = null;                           // v3: quiz engine
     this.stats = { start: 0, peak: 0, joins: 0, chats: 0, polls: [], quizzes: [] }; // v3: analytics
@@ -80,22 +82,18 @@ class TeacherRoom {
           return;
         }
         const name = (meta.name || "Student").slice(0, 40);
-        this.students.set(conn.peer, { conn, name, joinedAt: Date.now(), hand: false, mediaCalls: [], score: 0 });
-        this.attendance.push({ name, event: "joined", time: nowStamp() });
-        this.stats.joins++;                                       // v3: analytics
-        this.stats.peak = Math.max(this.stats.peak, this.students.size);
-        conn.send({ t: "welcome", roomName: this.roomName || this.code, count: this.students.size });
-        this._broadcastRoster();
-        this.onEvent("student-joined", { peerId: conn.peer, name });
-        // push current stage + cam to the newcomer
-        if (this.stageStream) this._callStudent(conn.peer, this.stageStream, "stage");
-        if (this.camStream)   this._callStudent(conn.peer, this.camStream, "teachercam");
-        if (this.activePoll)  conn.send({ t: "poll", poll: this.activePoll.def });
-        if (this.activeQuiz)  conn.send({ t: "quiz", quiz: this._quizPublicDef() }); // v3: late joiners get the quiz
+        /* v4: waiting room — hold the student until the teacher admits */
+        if (this.waitingRoom) {
+          this.pending.set(conn.peer, { conn, name });
+          conn.send({ t: "waiting" });
+          this.onEvent("waiting", { peerId: conn.peer, name });
+          return;
+        }
+        this._admit(conn, name);
       });
       conn.on("data", (d) => this._onData(conn, d));
-      conn.on("close", () => this._dropStudent(conn.peer));
-      conn.on("error", () => this._dropStudent(conn.peer));
+      conn.on("close", () => { this.pending.delete(conn.peer); this._dropStudent(conn.peer); });
+      conn.on("error", () => { this.pending.delete(conn.peer); this._dropStudent(conn.peer); });
     });
 
     // Students may call us back with their camera / mic.
@@ -109,6 +107,50 @@ class TeacherRoom {
       call.on("close", () => this.onEvent("student-media-end", { peerId: call.peer, kind }));
       if (stu) stu.mediaCalls.push(call);
     });
+  }
+
+  /* v4: admit a student (directly, or from the waiting room) */
+  _admit(conn, name) {
+    this.students.set(conn.peer, { conn, name, joinedAt: Date.now(), hand: false, mediaCalls: [], score: 0 });
+    this.attendance.push({ name, event: "joined", time: nowStamp() });
+    this.stats.joins++;
+    this.stats.peak = Math.max(this.stats.peak, this.students.size);
+    conn.send({ t: "welcome", roomName: this.roomName || this.code, count: this.students.size });
+    this._broadcastRoster();
+    this.onEvent("student-joined", { peerId: conn.peer, name });
+    // push current stage + cam to the newcomer
+    if (this.stageStream) this._callStudent(conn.peer, this.stageStream, "stage");
+    if (this.camStream)   this._callStudent(conn.peer, this.camStream, "teachercam");
+    if (this.activePoll)  conn.send({ t: "poll", poll: this.activePoll.def });
+    if (this.activeQuiz)  conn.send({ t: "quiz", quiz: this._quizPublicDef() });
+  }
+
+  /* v4: waiting-room controls */
+  setWaitingRoom(v) { this.waitingRoom = v; }
+  admit(peerId) {
+    const p = this.pending.get(peerId);
+    if (!p) return;
+    this.pending.delete(peerId);
+    p.conn.send({ t: "admitted" });
+    this._admit(p.conn, p.name);
+  }
+  admitAll() { for (const pid of [...this.pending.keys()]) this.admit(pid); }
+  deny(peerId) {
+    const p = this.pending.get(peerId);
+    if (!p) return;
+    this.pending.delete(peerId);
+    try { p.conn.send({ t: "rejected", reason: "The teacher did not admit you." }); } catch {}
+    setTimeout(() => { try { p.conn.close(); } catch {} }, 300);
+  }
+
+  /* v4: Zoom/Meet-style extras */
+  muteAllStudents() {
+    for (const [pid, stu] of this.students) {
+      try { stu.conn.send({ t: "micAllow", on: false }); } catch {}
+    }
+  }
+  spotlight(peerId, name) {     // tell everyone whose turn it is (shows banner)
+    this.broadcast({ t: "spotlight", name });
   }
 
   _onData(conn, d) {
@@ -145,6 +187,12 @@ class TeacherRoom {
         this.onEvent("hand", { peerId: conn.peer, name: stu.name, up: stu.hand });
         this._broadcastRoster();
         break;
+      case "reaction": {  // v4: emoji reactions (👍 ❤ 😂 🎉 😮 👏)
+        const emo = String(d.emoji).slice(0, 4);
+        this.onEvent("reaction", { name: stu.name, emoji: emo });
+        this.broadcast({ t: "reaction", name: stu.name, emoji: emo }, conn.peer);
+        break;
+      }
       case "pollAnswer":
         if (this.activePoll && !this.activePoll.voted.has(conn.peer)) {
           const i = Number(d.index);
@@ -375,6 +423,10 @@ class StudentRoom {
       case "kicked":    this.onEvent("kicked"); break;
       case "rejected":  this.onEvent("rejected", d); break;
       case "classEnded":this.onEvent("classEnded"); break;
+      case "waiting":   this.onEvent("waiting"); break;            // v4
+      case "admitted":  this.onEvent("admitted"); break;           // v4
+      case "reaction":  this.onEvent("reaction", d); break;        // v4
+      case "spotlight": this.onEvent("spotlight", d); break;       // v4
     }
   }
 
@@ -383,6 +435,7 @@ class StudentRoom {
   raiseHand(up)       { this.send({ t: "hand", up }); }
   answerPoll(index)   { this.send({ t: "pollAnswer", index }); }
   answerQuiz(qIndex, answer) { this.send({ t: "quizAnswer", qIndex, answer }); } // v3
+  sendReaction(emoji) { this.send({ t: "reaction", emoji }); }                   // v4
 
   async shareCamera(on) {
     if (!on) {

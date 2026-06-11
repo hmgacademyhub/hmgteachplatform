@@ -81,6 +81,21 @@ function onEvent(type, p) {
     case "quiz": showQuiz(p); break;                 // v3
     case "quizFeedback": showQuizFeedback(p); break; // v3
     case "quizEnd": showQuizLeaderboard(p); break;   // v3
+    case "waiting":                                   // v4: waiting room
+      $("#joinGate").classList.add("hide");
+      openModal("#mWaiting");
+      break;
+    case "admitted":                                  // v4
+      closeModal("#mWaiting");
+      enterStage();
+      toast("✅ Admitted — welcome to class!", "ok");
+      break;
+    case "reaction":                                  // v4
+      sFlyEmoji(p.emoji, p.name);
+      break;
+    case "spotlight":                                 // v4
+      toast("🌟 " + p.name + ", it's your turn!", "ok", 6000);
+      break;
     case "camRequest": handleCamRequest(p.on); break;
     case "micAllow":
       micAllowed = p.on;
@@ -164,6 +179,23 @@ $("#sBtnHand").addEventListener("click", () => {
   $("#sBtnHand").classList.toggle("active", handUp);
   toast(handUp ? "✋ Hand raised — the teacher can see it" : "Hand lowered");
 });
+
+/* v4: emoji reactions */
+$("#sBtnReact").addEventListener("click", () => $("#reactBar").classList.toggle("hide"));
+$$(".react-emo").forEach((b) => b.addEventListener("click", () => {
+  sRoom.sendReaction(b.textContent.trim());
+  sFlyEmoji(b.textContent.trim(), "You");
+  $("#reactBar").classList.add("hide");
+}));
+function sFlyEmoji(emoji, name) {
+  const el = document.createElement("div");
+  el.style.cssText = "position:fixed;z-index:9998;font-size:34px;pointer-events:none;left:" +
+    (12 + Math.random() * 70) + "%;bottom:90px;transition:all 2.6s ease-out;opacity:1";
+  el.innerHTML = emoji + (name ? '<div style="font-size:11px;text-align:center;color:#fff;text-shadow:0 1px 3px #000">' + escapeHtml(name) + "</div>" : "");
+  document.body.appendChild(el);
+  requestAnimationFrame(() => { el.style.bottom = "75%"; el.style.opacity = "0"; });
+  setTimeout(() => el.remove(), 2700);
+}
 
 $("#sBtnChat").addEventListener("click", () => $("#sDrawerChat").classList.toggle("open"));
 $("#sChatClose").addEventListener("click", () => $("#sDrawerChat").classList.remove("open"));

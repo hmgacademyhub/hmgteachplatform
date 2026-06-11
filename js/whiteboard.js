@@ -24,6 +24,11 @@ class Whiteboard {
     this.tool = "pen";
     this.color = opts.color || "#111111";
     this.size = opts.size || 3;
+    this.view = { s: 1, x: 0, y: 0 };               // v4: per-board zoom/pan (pinch with 2 fingers)
+    this.penOnly = Store.get("wb_penonly", false);  // v4: palm rejection — stylus draws, fingers only pinch/pan
+    this.fillShapes = false;                        // v4: filled vs outlined shapes
+    this._pointers = new Map();                     // v4: active pointers for pinch detection
+    this._pinch = null;
     this.pages = (this.persist && Store.get(this.persistKey, null)) || [this._newPage()];
     this.pageIndex = 0;
     this._lasers = [];                               // v2: fading laser strokes
@@ -58,7 +63,7 @@ class Whiteboard {
     this.redraw();
   }
 
-  /* ---------- pointer handling ---------- */
+  /* ---------- pointer handling (v4: pinch zoom/pan + palm rejection) ---------- */
   _bindPointer() {
     const el = this.overlay;
     el.style.touchAction = "none";
@@ -68,22 +73,98 @@ class Whiteboard {
     el.addEventListener("pointercancel", (e) => this._up(e));
     el.addEventListener("pointerleave", (e) => { if (this.drawing) this._up(e); });
   }
-  _pos(e) {
+  /* screen-normalised position (0..1 of the visible stage) */
+  _scr(e) {
     const r = this.overlay.getBoundingClientRect();
     return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
   }
+  /* convert screen-normalised → world (board) coordinates through the view */
+  _pos(e) {
+    const n = this._scr(e);
+    const v = this.view;
+    return { x: (n.x - v.x) / v.s, y: (n.y - v.y) / v.s };
+  }
+  _clampView() {
+    const v = this.view;
+    v.s = Math.min(6, Math.max(1, v.s));
+    v.x = Math.min(0, Math.max(1 - v.s, v.x));
+    v.y = Math.min(0, Math.max(1 - v.s, v.y));
+  }
+  resetView() {
+    this.view = { s: 1, x: 0, y: 0 };
+    this.redraw();
+    if (this.onViewChange) this.onViewChange(this.view);
+  }
   _down(e) {
-    if (this.tool === "text") { this._placeText(e); return; }
     e.preventDefault();
     this.overlay.setPointerCapture(e.pointerId);
+    this._pointers.set(e.pointerId, { n: this._scr(e), type: e.pointerType });
+
+    /* two fingers down → pinch zoom/pan THIS board only */
+    if (this._pointers.size === 2) {
+      if (this.drawing) {            // cancel half-drawn stroke
+        this.drawing = false; this.cur = null;
+        this.octx.clearRect(0, 0, this.overlay.width, this.overlay.height);
+      }
+      const [a, b] = [...this._pointers.values()].map((p) => p.n);
+      this._pinch = {
+        d0: Math.hypot(a.x - b.x, a.y - b.y) || 0.001,
+        mid0: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+        v0: { ...this.view }
+      };
+      return;
+    }
+    if (this._pinch) return;
+
+    /* palm rejection: in pen-only mode a finger pans instead of drawing */
+    if (this.penOnly && e.pointerType === "touch") {
+      this._pan = { n0: this._scr(e), v0: { ...this.view } };
+      return;
+    }
+    if (this.tool === "text") { this._placeText(e); return; }
     this.drawing = true;
     const p = this._pos(e);
     this.cur = {
       tool: this.tool, color: this.color, size: this.size,
+      fill: this.fillShapes && ["rect", "ellipse", "triangle", "diamond", "star"].includes(this.tool),
       pts: [p]
     };
   }
   _move(e) {
+    const rec = this._pointers.get(e.pointerId);
+    if (rec) rec.n = this._scr(e);
+
+    /* pinch zoom/pan */
+    if (this._pinch && this._pointers.size >= 2) {
+      e.preventDefault();
+      const [a, b] = [...this._pointers.values()].map((p) => p.n);
+      const d = Math.hypot(a.x - b.x, a.y - b.y) || 0.001;
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const p0 = this._pinch;
+      let s = p0.v0.s * (d / p0.d0);
+      s = Math.min(6, Math.max(1, s));
+      // keep the world point under the original midpoint anchored, then follow the new midpoint
+      const wx = (p0.mid0.x - p0.v0.x) / p0.v0.s;
+      const wy = (p0.mid0.y - p0.v0.y) / p0.v0.s;
+      this.view.s = s;
+      this.view.x = mid.x - wx * s;
+      this.view.y = mid.y - wy * s;
+      this._clampView();
+      this.redraw();
+      if (this.onViewChange) this.onViewChange(this.view);
+      return;
+    }
+    /* one-finger pan in pen-only mode */
+    if (this._pan) {
+      e.preventDefault();
+      const n = this._scr(e);
+      this.view.x = this._pan.v0.x + (n.x - this._pan.n0.x);
+      this.view.y = this._pan.v0.y + (n.y - this._pan.n0.y);
+      this._clampView();
+      this.redraw();
+      if (this.onViewChange) this.onViewChange(this.view);
+      return;
+    }
     if (!this.drawing || !this.cur) return;
     e.preventDefault();
     const evts = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
@@ -91,6 +172,9 @@ class Whiteboard {
     this._drawPreview();
   }
   _up(e) {
+    this._pointers.delete(e.pointerId);
+    if (this._pointers.size < 2) this._pinch = null;
+    if (this._pan && this._pointers.size === 0) this._pan = null;
     if (!this.drawing || !this.cur) return;
     this.drawing = false;
     const s = this.cur; this.cur = null;
@@ -155,8 +239,10 @@ class Whiteboard {
   }
   _drawStroke(ctx, s) {
     const W = this.canvas.width, H = this.canvas.height;
-    const X = (p) => p.x * W, Y = (p) => p.y * H;
+    const v = this.view || { s: 1, x: 0, y: 0 };
+    const X = (p) => (p.x * v.s + v.x) * W, Y = (p) => (p.y * v.s + v.y) * H;
     this._styleFor(ctx, s);
+    ctx.lineWidth *= v.s;   // ink thickens proportionally when zoomed
     const a = s.pts[0], b = s.pts[s.pts.length - 1];
     ctx.beginPath();
     switch (s.tool) {
@@ -173,23 +259,54 @@ class Whiteboard {
         ctx.lineTo(X(b) - hl * Math.cos(ang + 0.45), Y(b) - hl * Math.sin(ang + 0.45));
         ctx.stroke(); break;
       }
-      case "rect":
-        ctx.strokeRect(Math.min(X(a), X(b)), Math.min(Y(a), Y(b)),
-                       Math.abs(X(b) - X(a)), Math.abs(Y(b) - Y(a))); break;
+      case "rect": {
+        const rx = Math.min(X(a), X(b)), ry = Math.min(Y(a), Y(b));
+        const rw = Math.abs(X(b) - X(a)), rh = Math.abs(Y(b) - Y(a));
+        if (s.fill) ctx.fillRect(rx, ry, rw, rh); else ctx.strokeRect(rx, ry, rw, rh);
+        break;
+      }
       case "ellipse":
         ctx.ellipse((X(a) + X(b)) / 2, (Y(a) + Y(b)) / 2,
                     Math.abs(X(b) - X(a)) / 2, Math.abs(Y(b) - Y(a)) / 2, 0, 0, Math.PI * 2);
-        ctx.stroke(); break;
+        if (s.fill) ctx.fill(); else ctx.stroke();
+        break;
+      case "triangle": {  // v4
+        ctx.moveTo((X(a) + X(b)) / 2, Y(a));
+        ctx.lineTo(X(a), Y(b)); ctx.lineTo(X(b), Y(b)); ctx.closePath();
+        if (s.fill) ctx.fill(); else ctx.stroke();
+        break;
+      }
+      case "diamond": {   // v4
+        const mx = (X(a) + X(b)) / 2, my = (Y(a) + Y(b)) / 2;
+        ctx.moveTo(mx, Y(a)); ctx.lineTo(X(b), my); ctx.lineTo(mx, Y(b)); ctx.lineTo(X(a), my); ctx.closePath();
+        if (s.fill) ctx.fill(); else ctx.stroke();
+        break;
+      }
+      case "star": {      // v4: 5-point star in the drag box
+        const mx = (X(a) + X(b)) / 2, my = (Y(a) + Y(b)) / 2;
+        const R = Math.max(Math.abs(X(b) - X(a)), Math.abs(Y(b) - Y(a))) / 2;
+        for (let i = 0; i < 10; i++) {
+          const r = i % 2 === 0 ? R : R * 0.42;
+          const ang = -Math.PI / 2 + (i * Math.PI) / 5;
+          const px2 = mx + r * Math.cos(ang), py2 = my + r * Math.sin(ang);
+          i === 0 ? ctx.moveTo(px2, py2) : ctx.lineTo(px2, py2);
+        }
+        ctx.closePath();
+        if (s.fill) ctx.fill(); else ctx.stroke();
+        break;
+      }
       case "text": {
-        const px = Math.max(16, s.size * 9) * this.dpr;
+        const v2 = this.view || { s: 1 };
+        const px = Math.max(16, s.size * 9) * this.dpr * v2.s;
         ctx.font = `${px}px system-ui, sans-serif`;
         ctx.textBaseline = "top";
         ctx.fillText(s.text || "", X(a), Y(a)); break;
       }
       case "image": {   // v3: image stamp {pts:[topleft], w, h (relative), data}
         const img = this._imgCache(s);
+        const v2 = this.view || { s: 1 };
         if (img && img.complete && img.naturalWidth) {
-          ctx.drawImage(img, X(a), Y(a), s.w * W, s.h * H);
+          ctx.drawImage(img, X(a), Y(a), s.w * W * v2.s, s.h * H * v2.s);
         }
         break;
       }
@@ -286,8 +403,15 @@ class Whiteboard {
     this._save();
   }
   exportPNG() {
-    this.canvas.toBlob((b) => downloadBlob(b, `whiteboard-page${this.pageIndex + 1}-${Date.now()}.png`));
+    const keep = { ...this.view };
+    this.view = { s: 1, x: 0, y: 0 }; this.redraw();
+    this.canvas.toBlob((b) => {
+      downloadBlob(b, `whiteboard-page${this.pageIndex + 1}-${Date.now()}.png`);
+      this.view = keep; this.redraw();
+    });
   }
+  setPenOnly(v) { this.penOnly = v; Store.set("wb_penonly", v); }
+  setFill(v) { this.fillShapes = v; }
 
   /* ---------- v3: image stamps ---------- */
   _imgCache(s) {
@@ -331,6 +455,8 @@ class Whiteboard {
   /* ---------- v3: export the whole deck as a PDF ---------- */
   async exportDeckPDF(filename) {
     const keepIndex = this.pageIndex;
+    const keepView = { ...this.view };
+    this.view = { s: 1, x: 0, y: 0 };
     const jpegs = [];
     for (let i = 0; i < this.pages.length; i++) {
       this.pageIndex = i;
@@ -342,6 +468,7 @@ class Whiteboard {
       });
     }
     this.pageIndex = keepIndex;
+    this.view = keepView;
     this.redraw();
     downloadBlob(jpegsToPdf(jpegs), filename || `whiteboard-deck-${Date.now()}.pdf`);
   }

@@ -20,7 +20,7 @@ if (window.pdfjsLib) {
 /* ------------------------------------------------------------
    1. Pane / app management
    ------------------------------------------------------------ */
-const APPS = ["board", "pdf", "web", "notes", "image"];
+const APPS = ["board", "pdf", "web", "notes", "image", "graph", "video"];
 const paneState = {
   L: { app: Store.get("pane_L", "board"), instances: {} },
   R: { app: Store.get("pane_R", "pdf"),   instances: {} }
@@ -72,6 +72,8 @@ function initApp(side, app, inst) {
   else if (app === "web") initWeb(side, inst);
   else if (app === "notes") initNotes(side, inst);
   else if (app === "image") initImage(side, inst);
+  else if (app === "graph") initGraph(side, inst);   // v4
+  else if (app === "video") initVideo(side, inst);   // v4
 }
 
 /* ---- whiteboard ---- */
@@ -103,6 +105,25 @@ function initBoard(side, inst) {
   $(".wb-bg", el).value = wb.bgStyle;
   $(".wb-bg", el).addEventListener("change", (e) => wb.setBackground(e.target.value));
   $(".wb-export", el).addEventListener("click", () => wb.exportPNG());
+  /* v4: fill toggle, pen-only (palm rejection), zoom reset + live zoom label */
+  $(".wb-fill", el).addEventListener("click", (e) => {
+    wb.setFill(!wb.fillShapes);
+    e.currentTarget.classList.toggle("active", wb.fillShapes);
+    toast(wb.fillShapes ? "🪣 Shapes will be filled" : "Shapes outlined");
+  });
+  const penBtn = $(".wb-penonly", el);
+  penBtn.classList.toggle("active", wb.penOnly);
+  penBtn.addEventListener("click", () => {
+    wb.setPenOnly(!wb.penOnly);
+    penBtn.classList.toggle("active", wb.penOnly);
+    toast(wb.penOnly
+      ? "✍ Pen-only: stylus draws, fingers pan/zoom (palm rejection ON)"
+      : "✍ Finger-friendly: write with finger or stylus (palm rejection OFF)", "ok", 4000);
+  });
+  const zoomLblB = $(".wb-zoomlbl", el);
+  wb.onViewChange = (v) => { zoomLblB.textContent = Math.round(v.s * 100) + "%"; };
+  $(".wb-zoomreset", el).addEventListener("click", () => { wb.resetView(); toast("Board zoom reset"); });
+
   $(".wb-prev", el).addEventListener("click", () => { wb.gotoPage(wb.pageIndex - 1); updatePageInfo(); });
   $(".wb-next", el).addEventListener("click", () => { wb.gotoPage(wb.pageIndex + 1); updatePageInfo(); });
   $(".wb-add",  el).addEventListener("click", () => { wb.addPage(); updatePageInfo(); });
@@ -179,6 +200,38 @@ function initPdf(side, inst) {
     const n = Number(e.target.value);
     if (doc && n >= 1 && n <= doc.numPages) { pageNum = n; renderPage(); }
   });
+
+  /* ----- v4: two-finger pinch zoom on the PDF — affects THIS pane only ----- */
+  (function pdfPinch() {
+    const scroll = $(".pdf-scroll", el);
+    const touches = new Map();
+    let pin = null;
+    scroll.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "touch") return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) {
+        const [a, b] = [...touches.values()];
+        pin = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, s0: scale };
+      }
+    });
+    scroll.addEventListener("pointermove", (e) => {
+      if (e.pointerType !== "touch" || !touches.has(e.pointerId)) return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pin && touches.size >= 2) {
+        e.preventDefault();
+        const [a, b] = [...touches.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+        const ns = Math.min(5, Math.max(0.3, pin.s0 * (d / pin.d0)));
+        if (Math.abs(ns - scale) / scale > 0.04) {  // re-render only on meaningful change
+          fitMode = false; scale = ns; renderPage();
+        }
+      }
+    }, { passive: false });
+    const end = (e) => { touches.delete(e.pointerId); if (touches.size < 2) pin = null; };
+    scroll.addEventListener("pointerup", end);
+    scroll.addEventListener("pointercancel", end);
+    scroll.style.touchAction = "pan-x pan-y";   // one finger scrolls, two fingers pinch
+  })();
 
   /* ----- v2: annotate on top of the PDF page ----- */
   function syncAnnotStage() {
@@ -265,6 +318,201 @@ function initImage(side, inst) {
   $(".img-file", el).addEventListener("change", (e) => { if (e.target.files[0]) load(e.target.files[0]); });
   el.addEventListener("dragover", (e) => e.preventDefault());
   el.addEventListener("drop", (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith("image/")) load(f); });
+
+  /* v4: pinch zoom the image — this pane only */
+  (function imgPinch() {
+    const scroll = $(".img-scroll", el);
+    let zoom = 1;
+    const touches = new Map();
+    let pin = null;
+    scroll.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "touch") return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) {
+        const [a, b] = [...touches.values()];
+        pin = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: zoom };
+      }
+    });
+    scroll.addEventListener("pointermove", (e) => {
+      if (e.pointerType !== "touch" || !touches.has(e.pointerId)) return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pin && touches.size >= 2) {
+        e.preventDefault();
+        const [a, b] = [...touches.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+        zoom = Math.min(6, Math.max(0.5, pin.z0 * (d / pin.d0)));
+        img.style.transform = "scale(" + zoom + ")";
+        img.style.transformOrigin = "center center";
+        img.style.maxWidth = zoom > 1 ? "none" : "96%";
+        img.style.maxHeight = zoom > 1 ? "none" : "96%";
+      }
+    }, { passive: false });
+    const end = (e) => { touches.delete(e.pointerId); if (touches.size < 2) pin = null; };
+    scroll.addEventListener("pointerup", end);
+    scroll.addEventListener("pointercancel", end);
+    scroll.style.touchAction = "pan-x pan-y";
+  })();
+}
+
+/* ---- v4: graph plotter (offline Desmos-style, no AI/APIs) ---- */
+function initGraph(side, inst) {
+  const el = inst.el;
+  const canvas = $(".gr-canvas", el);
+  const stage = $(".gr-stage", el);
+  const ctx = canvas.getContext("2d");
+  let curves = [];                                    // [{expr, fn, color}]
+  let view = { cx: 0, cy: 0, w: 20 };                 // world width in units
+  const COLORS = ["#1565d8", "#e02b2b", "#0a8a3a", "#8b5cf6", "#f59e0b"];
+  inst.getCanvas = () => canvas;
+
+  function compile(expr) {
+    let e = expr.toLowerCase()
+      .replace(/\^/g, "**")
+      .replace(/(sin|cos|tan|asin|acos|atan|sqrt|log10|abs|exp|floor|ceil|round)\(/g, "Math.$1(")
+      .replace(/(?<!Math\.)\blog\(/g, "Math.log10(")
+      .replace(/\bln\(/g, "Math.log(")
+      .replace(/\bpi\b/g, "Math.PI")
+      .replace(/(?<![\w.])e(?![\w(])/g, "Math.E");
+    if (!/^[\d\sx+\-*/().,MathPIEsqrtincoaglbexpflorud*]+$/.test(e)) throw new Error("Unsupported characters");
+    // eslint-disable-next-line no-new-func
+    const fn = new Function("x", '"use strict";return (' + e + ");");
+    fn(1); // smoke test
+    return fn;
+  }
+
+  function draw() {
+    const r = stage.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = r.width * dpr; canvas.height = r.height * dpr;
+    const W = canvas.width, H = canvas.height;
+    const ar = H / W;
+    const wH = view.w * ar;
+    const x0 = view.cx - view.w / 2, y0 = view.cy + wH / 2;
+    const px = (x) => ((x - x0) / view.w) * W;
+    const py = (y) => ((y0 - y) / wH) * H;
+
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
+    // grid
+    const step = niceStep(view.w / 10);
+    ctx.strokeStyle = "#e3e8f4"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let gx = Math.ceil(x0 / step) * step; gx < x0 + view.w; gx += step) { ctx.moveTo(px(gx), 0); ctx.lineTo(px(gx), H); }
+    for (let gy = Math.ceil((y0 - wH) / step) * step; gy < y0; gy += step) { ctx.moveTo(0, py(gy)); ctx.lineTo(W, py(gy)); }
+    ctx.stroke();
+    // axes
+    ctx.strokeStyle = "#7a86ad"; ctx.lineWidth = 2 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(0, py(0)); ctx.lineTo(W, py(0));
+    ctx.moveTo(px(0), 0); ctx.lineTo(px(0), H);
+    ctx.stroke();
+    // labels
+    ctx.fillStyle = "#5a6488"; ctx.font = (11 * dpr) + "px system-ui";
+    for (let gx = Math.ceil(x0 / step) * step; gx < x0 + view.w; gx += step) {
+      if (Math.abs(gx) > 1e-9) ctx.fillText(trimNum(gx), px(gx) + 3, py(0) + 14 * dpr);
+    }
+    for (let gy = Math.ceil((y0 - wH) / step) * step; gy < y0; gy += step) {
+      if (Math.abs(gy) > 1e-9) ctx.fillText(trimNum(gy), px(0) + 5, py(gy) - 4);
+    }
+    // curves
+    curves.forEach((c, ci) => {
+      ctx.strokeStyle = c.color; ctx.lineWidth = 2.4 * dpr;
+      ctx.beginPath();
+      let pen = false;
+      for (let i = 0; i <= W; i += 2) {
+        const x = x0 + (i / W) * view.w;
+        let y;
+        try { y = c.fn(x); } catch { y = NaN; }
+        if (!Number.isFinite(y)) { pen = false; continue; }
+        const sy = py(y);
+        if (sy < -H || sy > 2 * H) { pen = false; continue; }
+        pen ? ctx.lineTo(i, sy) : ctx.moveTo(i, sy);
+        pen = true;
+      }
+      ctx.stroke();
+      ctx.fillStyle = c.color; ctx.font = "bold " + (12 * dpr) + "px system-ui";
+      ctx.fillText("y = " + c.expr, 10 * dpr, (20 + ci * 18) * dpr);
+    });
+  }
+  function niceStep(raw) {
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const m = raw / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+  function trimNum(n) { return String(Math.round(n * 1000) / 1000); }
+
+  function plot(add) {
+    const expr = $(".gr-fx", el).value.trim();
+    if (!expr) return;
+    try {
+      const fn = compile(expr);
+      if (!add) curves = [];
+      curves.push({ expr, fn, color: COLORS[curves.length % COLORS.length] });
+      draw();
+    } catch { toast("Could not understand that function. Try e.g. x^2-3*x+2, sin(x), sqrt(x)", "err", 5000); }
+  }
+  $(".gr-plot", el).addEventListener("click", () => plot(false));
+  $(".gr-add", el).addEventListener("click", () => plot(true));
+  $(".gr-fx", el).addEventListener("keydown", (e) => { if (e.key === "Enter") plot(false); });
+  $(".gr-clear", el).addEventListener("click", () => { curves = []; draw(); });
+  $(".gr-zi", el).addEventListener("click", () => { view.w = Math.max(1, view.w / 1.4); draw(); });
+  $(".gr-zo", el).addEventListener("click", () => { view.w = Math.min(200, view.w * 1.4); draw(); });
+
+  /* drag to pan + pinch to zoom — this pane only */
+  const touches = new Map();
+  let pin = null, panStart = null;
+  stage.addEventListener("pointerdown", (e) => {
+    stage.setPointerCapture(e.pointerId);
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size === 2) {
+      const [a, b] = [...touches.values()];
+      pin = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, w0: view.w };
+      panStart = null;
+    } else panStart = { x: e.clientX, y: e.clientY, cx: view.cx, cy: view.cy };
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (!touches.has(e.pointerId)) return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const r = stage.getBoundingClientRect();
+    if (pin && touches.size >= 2) {
+      const [a, b] = [...touches.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      view.w = Math.min(200, Math.max(1, pin.w0 * (pin.d0 / d)));
+      draw();
+    } else if (panStart) {
+      view.cx = panStart.cx - (e.clientX - panStart.x) / r.width * view.w;
+      view.cy = panStart.cy + (e.clientY - panStart.y) / r.height * (view.w * r.height / r.width);
+      draw();
+    }
+  });
+  const grEnd = (e) => { touches.delete(e.pointerId); if (touches.size < 2) pin = null; if (!touches.size) panStart = null; };
+  stage.addEventListener("pointerup", grEnd);
+  stage.addEventListener("pointercancel", grEnd);
+
+  new ResizeObserver(draw).observe(stage);
+  draw();
+}
+
+/* ---- v4: local video/audio player ---- */
+function initVideo(side, inst) {
+  const el = inst.el;
+  const vid = $(".vid-el", el);
+  inst.videoEl = vid;
+  let rate = 1;
+  function load(f) {
+    vid.src = URL.createObjectURL(f);
+    $(".vid-hint", el).classList.add("hide");
+    vid.play().catch(() => {});
+  }
+  $(".vid-open", el).addEventListener("click", () => $(".vid-file", el).click());
+  $(".vid-file", el).addEventListener("change", (e) => { if (e.target.files[0]) load(e.target.files[0]); });
+  el.addEventListener("dragover", (e) => e.preventDefault());
+  el.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (f && (f.type.startsWith("video/") || f.type.startsWith("audio/"))) load(f);
+  });
+  $(".vid-slow", el).addEventListener("click", () => { rate = Math.max(0.25, rate - 0.25); vid.playbackRate = rate; $(".vid-rate", el).textContent = rate.toFixed(2) + "×"; });
+  $(".vid-fastr", el).addEventListener("click", () => { rate = Math.min(3, rate + 0.25); vid.playbackRate = rate; $(".vid-rate", el).textContent = rate.toFixed(2) + "×"; });
 }
 
 /* ------------------------------------------------------------
@@ -327,7 +575,8 @@ $("#btnSwap").addEventListener("click", () => {
   setTimeout(resizeBoards, 80);
 });
 
-$("#btnFull").addEventListener("click", toggleFullscreen);
+/* v4 (issue 3): ⛶ now triggers focus-fullscreen — handler attached in the
+   v4 focus-mode section below (hides platform menu + browser bars together). */
 
 /* mount initial apps */
 mountApp("L", paneState.L.app);
@@ -380,11 +629,11 @@ function drawComposite() {
 
   // LIVE watermark + clock
   ctx.fillStyle = "rgba(16,20,43,.78)";
-  ctx.fillRect(W - 200, H - 30, 200, 30);
+  ctx.fillRect(W - 300, H - 30, 300, 30);
   ctx.fillStyle = "#9aa3cf";
   ctx.font = "13px system-ui, sans-serif";
   ctx.textBaseline = "middle";
-  ctx.fillText("HMG ClassDeck • " + new Date().toLocaleTimeString(), W - 192, H - 15);
+  ctx.fillText("HMG ACADEMY CLASS DECK • " + new Date().toLocaleTimeString(), W - 292, H - 15);
 }
 
 function drawPaneInto(ctx, side, x, y, w, h, headH) {
@@ -395,7 +644,7 @@ function drawPaneInto(ctx, side, x, y, w, h, headH) {
   ctx.fillStyle = "#eef1ff";
   ctx.font = "bold 15px system-ui, sans-serif";
   ctx.textBaseline = "middle";
-  const titles = { board: "✏ Whiteboard", pdf: "📄 Learning material", web: "🌐 Web resource", notes: "🗒 Notes", image: "🖼 Image" };
+  const titles = { board: "✏ Whiteboard", pdf: "📄 Learning material", web: "🌐 Web resource", notes: "🗒 Notes", image: "🖼 Image", graph: "📈 Graph", video: "🎬 Video" };
   ctx.fillText(titles[st.app] || st.app, x + 12, y + headH / 2);
 
   const cx = x, cy = y + headH, cw = w, ch = h - headH;
@@ -430,6 +679,16 @@ function drawPaneInto(ctx, side, x, y, w, h, headH) {
       const dw = im.naturalWidth * s, dh = im.naturalHeight * s;
       ctx.fillStyle = "#383d52"; ctx.fillRect(cx, cy, cw, ch);
       ctx.drawImage(im, cx + (cw - dw) / 2, cy + (ch - dh) / 2, dw, dh);
+    } else if (st.app === "graph" && inst) {                       // v4
+      const c = inst.getCanvas && inst.getCanvas();
+      if (c && c.width) ctx.drawImage(c, cx, cy, cw, ch);
+      else drawPlaceholder(ctx, cx, cy, cw, ch, "No graph yet");
+    } else if (st.app === "video" && inst && inst.videoEl && inst.videoEl.videoWidth) {  // v4
+      const vEl = inst.videoEl;
+      const s = Math.min(cw / vEl.videoWidth, ch / vEl.videoHeight);
+      const dw = vEl.videoWidth * s, dh = vEl.videoHeight * s;
+      ctx.fillStyle = "#000"; ctx.fillRect(cx, cy, cw, ch);
+      ctx.drawImage(vEl, cx + (cw - dw) / 2, cy + (ch - dh) / 2, dw, dh);
     } else if (st.app === "web") {
       drawPlaceholder(ctx, cx, cy, cw, ch,
         "🌐 Web resource open on teacher's screen", "Browsers block iframe capture for privacy.", "Tip: use 'Share screen' broadcast mode, or show the page via PDF/Image.");
@@ -490,6 +749,13 @@ function studentLink() {
 $("#btnQR").addEventListener("click", () => {
   $("#inviteLink").value = studentLink();
   $("#inviteCode").textContent = roomCode;
+  /* v4: clear join diagnostics */
+  $("#inviteLiveWarn").style.display = (room && room.peer && !room.peer.destroyed) ? "none" : "block";
+  const pin = Store.get("pin", "");
+  $("#invitePin").textContent = pin ? "Class PIN: " + pin + " (students must type this)" : "No PIN set (anyone with the link can join)";
+  if (location.protocol === "file:") {
+    toast("⚠ You are running from a local file — deploy to your https:// address first, or students cannot reach you.", "err", 8000);
+  }
   const box = $("#qrBox"); box.innerHTML = "";
   try { new QRCode(box, { text: studentLink(), width: 190, height: 190 }); } catch {}
   openModal("#mInvite");
@@ -833,17 +1099,26 @@ function stopCountdown() {
   if (classStartTs) $("#timerVal").textContent = fmtTime((Date.now() - classStartTs) / 1000);
 }
 
-/* ---- local recording (MediaRecorder) ---- */
-let recorder = null, recChunks = [];
+/* ---- local recording (MediaRecorder) ----
+   v4 (issue 8): recording now ALWAYS uses its own private composite-canvas
+   stream + mic. It NEVER calls getDisplayMedia and never touches the screen-
+   capture pipeline, so it cannot conflict with Google Meet / Zoom screen
+   sharing — Meet/Zoom keep sharing the screen, ClassDeck quietly records the
+   workspace in parallel. */
+let recorder = null, recChunks = [], recStream = null;
 $("#btnRec").addEventListener("click", () => {
   if (recorder && recorder.state === "recording") { stopRecording(); return; }
   startRecording();
 });
-function startRecording() {
-  if (!stageStream) { startCompositeStage(); }
+async function startRecording() {
+  // private pipeline: composite canvas (independent of broadcast/screen share)
+  if (!COMP.raf) { drawComposite(); COMP.raf = requestAnimationFrame(compositeLoop); }
+  recStream = new MediaStream(COMP.canvas.captureStream(COMP.fps).getVideoTracks());
+  await ensureMic(true);
+  if (micStream) micStream.getAudioTracks().forEach((t) => recStream.addTrack(t));
   try {
     const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus") ? "video/webm;codecs=vp8,opus" : "video/webm";
-    recorder = new MediaRecorder(stageStream, { mimeType: mime, videoBitsPerSecond: 900_000 });
+    recorder = new MediaRecorder(recStream, { mimeType: mime, videoBitsPerSecond: 900_000 });
     recChunks = [];
     recorder.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
     recorder.onstop = () => {
@@ -857,9 +1132,37 @@ function startRecording() {
 }
 function stopRecording() {
   try { recorder.stop(); } catch {}
+  try { if (recStream) recStream.getVideoTracks().forEach((t) => t.stop()); } catch {}
   $("#btnRec").classList.remove("active");
   toast("Recording saved to your downloads", "ok");
 }
+
+/* v4: teacher self-view — draggable anywhere + tap to cycle size
+   (small → medium → large). In Meet/Zoom companion mode this floating
+   camera is part of the shared screen, so students see your face. */
+(function selfViewUX() {
+  const sv = $("#selfView");
+  const sizes = [150, 230, 330];
+  let si = 0, moved = false;
+  let drag = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  sv.addEventListener("pointerdown", (e) => {
+    drag = true; moved = false; sv.setPointerCapture(e.pointerId);
+    sx = e.clientX; sy = e.clientY;
+    const r = sv.getBoundingClientRect(); ox = r.left; oy = r.top;
+  });
+  sv.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    if (Math.hypot(e.clientX - sx, e.clientY - sy) > 8) moved = true;
+    if (!moved) return;
+    sv.style.left = Math.max(2, Math.min(window.innerWidth - sv.offsetWidth - 2, ox + e.clientX - sx)) + "px";
+    sv.style.top  = Math.max(2, Math.min(window.innerHeight - sv.offsetHeight - 2, oy + e.clientY - sy)) + "px";
+    sv.style.right = "auto"; sv.style.bottom = "auto";
+  });
+  sv.addEventListener("pointerup", () => {
+    drag = false;
+    if (!moved) { si = (si + 1) % sizes.length; sv.style.width = sizes[si] + "px"; }
+  });
+})();
 
 /* ---- settings ---- */
 $("#btnSettings").addEventListener("click", () => {
@@ -957,11 +1260,33 @@ function setFocus(on) {
   studioEl.classList.toggle("focus", on);
   focusHandle.classList.toggle("hide", !on);
   Store.set("focus", on);
-  setTimeout(resizeBoards, 120);
-  if (on) toast("🎯 Focus mode — toolbars hidden. Tap ☰ (top-left) to bring them back.", "ok", 4500);
+  /* v4 (issue 2): focus mode also enters browser fullscreen, which hides
+     Chrome's address bar + title bar — the panes get the WHOLE device screen.
+     (If installed as a PWA, there is no address bar at all.) */
+  if (on && !document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else if (!on && document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  }
+  setTimeout(resizeBoards, 200);
+  if (on) toast("🎯 Focus mode — toolbars AND browser bars hidden. Tap ☰ (top-left) to come back.", "ok", 4500);
 }
 $("#btnFocus").addEventListener("click", () => setFocus(true));
 focusHandle.addEventListener("click", () => setFocus(false));
+
+/* v4 (issue 3): the ⛶ fullscreen button now also hides the platform top menu
+   (fullscreen = focus). Exiting fullscreen restores everything. */
+$("#btnFull").addEventListener("click", () => { if (!focusOn) setFocus(true); });
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement && focusOn) {
+    // user pressed Back / system gesture to exit fullscreen → restore toolbars
+    focusOn = false;
+    studioEl.classList.remove("focus");
+    focusHandle.classList.add("hide");
+    Store.set("focus", false);
+    setTimeout(resizeBoards, 200);
+  }
+});
 /* keyboard escape hatch too */
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && focusOn) setFocus(false);
@@ -980,15 +1305,28 @@ document.addEventListener("keydown", (e) => {
    ------------------------------------------------------------ */
 const meetMode = new URLSearchParams(location.search).get("meet") === "1";
 if (meetMode) {
-  ["#btnGoLive", "#btnEndLive", "#btnCam", "#btnMic", "#btnStudents", "#btnChat",
+  /* v4 (issue 9): keep 📷 Cam available in Meet/Zoom companion mode.
+     Toggling it shows your self-view PiP on screen — and because Meet/Zoom is
+     sharing your WHOLE screen, students see your face through the share. */
+  ["#btnGoLive", "#btnEndLive", "#btnMic", "#btnStudents", "#btnChat",
    "#btnPoll", "#roomInfo", "#btnQR", "#liveBadge"]
     .forEach((s) => { const el = $(s); if (el) el.classList.add("hide"); });
   const badge = document.createElement("span");
   badge.className = "badge meet";
-  badge.textContent = "● MEET COMPANION";
+  badge.textContent = "● COMPANION";
   $(".topbar .brand").after(badge);
+
+  /* v4 (issue 9): student cameras while using Meet/Zoom — use the conferencing
+     app's own picture-in-picture. A help button explains it. */
+  const pipBtn = document.createElement("button");
+  pipBtn.className = "btn small";
+  pipBtn.textContent = "📺 See students";
+  pipBtn.title = "How to see student cameras while teaching here";
+  pipBtn.addEventListener("click", () => openModal("#mMeetPip"));
+  badge.after(pipBtn);
+
   window._wantWake = true; keepAwake(true);
-  toast("Meet Companion: share your screen in Google Meet, then tap 🎯 to hide toolbars.", "ok", 6000);
+  toast("Companion mode: share your screen in Meet/Zoom, then tap 🎯. Tap 📺 to learn how to see student cameras.", "ok", 7000);
 }
 
 /* restore focus state across reloads (e.g. accidental refresh mid-class) */
@@ -1227,46 +1565,118 @@ onRoomEvent = function (type, p) {
 };
 
 /* ------------------------------------------------------------
-   v3.3 Floating draggable calculator (scientific basics)
+   v4: FULL SCIENTIFIC CALCULATOR (upgraded from v3)
+   sin/cos/tan + inverses, ln/log, powers/roots, factorial,
+   e/π, Ans, memory M+/M-/MR/MC, DEG/RAD toggle, history tape.
    ------------------------------------------------------------ */
 const CALC_KEYS = [
-  "C", "(", ")", "%", "⌫",
-  "7", "8", "9", "÷", "√",
-  "4", "5", "6", "×", "x²",
-  "1", "2", "3", "−", "π",
-  "0", ".", "+", "=",
+  "2nd", "DEG", "MC", "MR", "M+", "M−",
+  "sin", "cos", "tan", "π", "e", "⌫",
+  "ln", "log", "√", "xʸ", "x²", "C",
+  "7", "8", "9", "(", ")", "÷",
+  "4", "5", "6", "n!", "%", "×",
+  "1", "2", "3", "1/x", "Ans", "−",
+  "0", ".", "±", "EXP", "=", "+"
 ];
+const CALC_2ND = { sin: "sin⁻¹", cos: "cos⁻¹", tan: "tan⁻¹", ln: "eˣ", log: "10ˣ", "√": "∛", "x²": "x³" };
+let calcExpr = "", calcAns = 0, calcMem = 0, calcDeg = true, calc2nd = false;
+
 (function buildCalc() {
   const grid = $("#calcKeys");
+  grid.innerHTML = "";
   CALC_KEYS.forEach((k) => {
+    if (k === "DEG") return; // handled by header button
     const b = document.createElement("button");
     b.textContent = k;
-    if ("÷×−+%√".includes(k) || k === "x²" || k === "π") b.className = "op";
+    b.dataset.k = k;
+    if (["sin","cos","tan","ln","log","√","xʸ","x²","n!","1/x","π","e","EXP","±","%","÷","×","−","+","(",")","Ans"].includes(k)) b.className = "op";
     if (k === "=") b.className = "eq";
-    b.addEventListener("click", () => calcPress(k));
+    if (["2nd","MC","MR","M+","M−","C","⌫"].includes(k)) b.className = "mem";
+    b.addEventListener("click", () => calcPress(k, b));
     grid.appendChild(b);
   });
 })();
-let calcExpr = "";
-function calcPress(k) {
+
+$("#calcDeg").addEventListener("click", (e) => {
+  calcDeg = !calcDeg;
+  e.currentTarget.textContent = calcDeg ? "DEG" : "RAD";
+  toast("Angles in " + (calcDeg ? "degrees" : "radians"));
+});
+
+function calcFact(n) {
+  if (n < 0 || n !== Math.floor(n) || n > 170) return NaN;
+  let r = 1; for (let i = 2; i <= n; i++) r *= i; return r;
+}
+function calcEval(expr) {
+  const D = calcDeg ? "(Math.PI/180)*" : "";
+  const Dinv = calcDeg ? "(180/Math.PI)*" : "";
+  let e = expr
+    .replace(/π/g, "(Math.PI)").replace(/(?<![\w.])e(?![\w(])/g, "(Math.E)")
+    .replace(/Ans/g, "(" + calcAns + ")")
+    .replace(/÷/g, "/").replace(/×/g, "*").replace(/−/g, "-")
+    .replace(/sin⁻¹\(/g, "@ASIN(").replace(/cos⁻¹\(/g, "@ACOS(").replace(/tan⁻¹\(/g, "@ATAN(")
+    .replace(/sin\(/g, "Math.sin(" + D).replace(/cos\(/g, "Math.cos(" + D).replace(/tan\(/g, "Math.tan(" + D)
+    .replace(/@ASIN\(/g, Dinv + "Math.asin(").replace(/@ACOS\(/g, Dinv + "Math.acos(").replace(/@ATAN\(/g, Dinv + "Math.atan(")
+    .replace(/eˣ\(/g, "Math.exp(").replace(/10ˣ\(/g, "Math.pow(10,")
+    .replace(/ln\(/g, "Math.log(").replace(/log\(/g, "Math.log10(")
+    .replace(/∛\(/g, "Math.cbrt(").replace(/∛(\d+(\.\d+)?)/g, "Math.cbrt($1)")
+    .replace(/√\(/g, "Math.sqrt(").replace(/√(\d+(\.\d+)?)/g, "Math.sqrt($1)")
+    .replace(/(\d+(\.\d+)?|\))³/g, "Math.pow($1,3)")
+    .replace(/(\d+(\.\d+)?|\))²/g, "Math.pow($1,2)")
+    .replace(/(\d+(\.\d+)?|\))!/g, "FACT($1)")
+    .replace(/\^/g, "**")
+    .replace(/(\d+(\.\d+)?)E(\+?-?\d+)/g, "($1*Math.pow(10,$3))")
+    .replace(/%/g, "/100");
+  if (!/^[\d+\-*/().,\s a-zA-Z*@!]*$/.test(e)) throw new Error("bad");
+  // eslint-disable-next-line no-new-func
+  const val = Function("FACT", '"use strict";return (' + e + ")")(calcFact);
+  if (!Number.isFinite(val)) throw new Error("math");
+  return Math.round(val * 1e12) / 1e12;
+}
+function calcPress(k, btn) {
   const disp = $("#calcDisplay");
-  if (k === "C") calcExpr = "";
-  else if (k === "⌫") calcExpr = calcExpr.slice(0, -1);
-  else if (k === "=") {
-    try {
-      let e = calcExpr.replace(/÷/g, "/").replace(/×/g, "*").replace(/−/g, "-")
-        .replace(/π/g, "Math.PI").replace(/√\(/g, "Math.sqrt(").replace(/√(\d+(\.\d+)?)/g, "Math.sqrt($1)")
-        .replace(/(\d+(\.\d+)?|\))²/g, "Math.pow($1,2)").replace(/%/g, "/100");
-      if (!/^[\d+\-*/().,\sMathPIsqrtpow]+$/.test(e)) throw new Error("bad");
-      // eslint-disable-next-line no-new-func
-      const val = Function('"use strict";return (' + e + ")")();
-      calcExpr = String(Number.isFinite(val) ? Math.round(val * 1e10) / 1e10 : "Error");
-    } catch { calcExpr = "Error"; }
+  const hist = $("#calcHist");
+  switch (k) {
+    case "C": calcExpr = ""; break;
+    case "⌫": calcExpr = calcExpr.slice(0, -1); break;
+    case "2nd":
+      calc2nd = !calc2nd;
+      btn.classList.toggle("active", calc2nd);
+      $$("#calcKeys button").forEach((b) => {
+        const base = b.dataset.k;
+        if (CALC_2ND[base]) b.textContent = calc2nd ? CALC_2ND[base] : base;
+      });
+      return;
+    case "MC": calcMem = 0; toast("Memory cleared"); return;
+    case "MR": calcExpr += String(calcMem); break;
+    case "M+": try { calcMem += calcEval(calcExpr || String(calcAns)); toast("M = " + calcMem); } catch {} return;
+    case "M−": try { calcMem -= calcEval(calcExpr || String(calcAns)); toast("M = " + calcMem); } catch {} return;
+    case "=":
+      try {
+        const val = calcEval(calcExpr);
+        const line = document.createElement("div");
+        line.textContent = calcExpr + " = " + val;
+        hist.prepend(line);
+        while (hist.children.length > 6) hist.lastChild.remove();
+        calcAns = val; calcExpr = String(val);
+      } catch { calcExpr = ""; disp.value = "Error"; return; }
+      break;
+    case "±":
+      calcExpr = calcExpr.startsWith("-") ? calcExpr.slice(1) : "-" + calcExpr; break;
+    case "xʸ": calcExpr += "^"; break;
+    case "x²": calcExpr += calc2nd ? "³" : "²"; break;
+    case "n!": calcExpr += "!"; break;
+    case "1/x": calcExpr = "1/(" + (calcExpr || calcAns) + ")"; break;
+    case "EXP": calcExpr += "E"; break;
+    case "sin": case "cos": case "tan": case "ln": case "log":
+      calcExpr += (calc2nd ? CALC_2ND[k] : k) + "("; break;
+    case "sin⁻¹": case "cos⁻¹": case "tan⁻¹": case "eˣ": case "10ˣ":
+      calcExpr += k + "("; break;
+    case "√": calcExpr += (calc2nd ? "∛" : "√") + "("; break;
+    case "∛": calcExpr += "∛("; break;
+    default: calcExpr += k;
   }
-  else if (k === "x²") calcExpr += "²";
-  else calcExpr += k;
   disp.value = calcExpr || "0";
-  if (calcExpr === "Error") calcExpr = "";
 }
 $("#btnCalc").addEventListener("click", () => $("#calcBox").classList.toggle("hide"));
 $("#calcClose").addEventListener("click", () => $("#calcBox").classList.add("hide"));
@@ -1332,7 +1742,7 @@ $("#reportDownload").addEventListener("click", () => {
   const openBtn = $("#btnSettings");
   openBtn.addEventListener("click", () => {
     $("#setPin").value = Store.get("pin", "");
-    $("#setBrand").value = Store.get("brand", "HMG ClassDeck");
+    $("#setBrand").value = Store.get("brand", "HMG ACADEMY CLASS DECK");
     $("#setAccent").value = Store.get("accent", "#ffb347");
   });
   $("#setSave").addEventListener("click", () => {
@@ -1389,7 +1799,7 @@ const _origDrawComposite = drawComposite;
 drawComposite = function () {
   _origDrawComposite();
   const brand = Store.get("brand", "");
-  if (brand && brand !== "HMG ClassDeck") {
+  if (brand && brand !== "HMG ACADEMY CLASS DECK") {
     const ctx = COMP.ctx;
     ctx.fillStyle = "rgba(16,20,43,.78)";
     const w = ctx.measureText(brand).width + 26;
@@ -1400,6 +1810,76 @@ drawComposite = function () {
     ctx.fillText(brand, 10, COMP.h - 15);
   }
 };
+
+/* ------------------------------------------------------------
+   v4: Zoom/Meet-style classroom controls
+   (waiting room, mute-all, spotlight, emoji reactions)
+   ------------------------------------------------------------ */
+$("#btnWaiting").addEventListener("click", (e) => {
+  if (!room) { toast("Go live first"); return; }
+  room.setWaitingRoom(!room.waitingRoom);
+  e.currentTarget.classList.toggle("active", room.waitingRoom);
+  toast(room.waitingRoom
+    ? "🚪 Waiting room ON — you must admit each student"
+    : "Waiting room off — students join directly");
+});
+$("#btnMuteAll").addEventListener("click", () => {
+  if (!room) return;
+  room.muteAllStudents();
+  $$('#rosterList [data-act="mic"]').forEach((b) => b.classList.remove("active"));
+  toast("🔇 All student mics revoked");
+});
+
+function renderWaiting() {
+  const list = $("#waitingList");
+  if (!room || room.pending.size === 0) { list.innerHTML = ""; return; }
+  list.innerHTML = '<b style="font-size:13px">🚪 Waiting to be admitted</b>';
+  for (const [pid, p] of room.pending) {
+    const row = document.createElement("div");
+    row.className = "stu-row";
+    row.style.borderColor = "var(--warn)";
+    row.innerHTML = `<span class="name">${escapeHtml(p.name)}</span>
+      <button class="btn small ok" data-a="adm">✔ Admit</button>
+      <button class="btn small danger" data-a="deny">✕</button>`;
+    row.querySelector('[data-a="adm"]').addEventListener("click", () => { room.admit(pid); renderWaiting(); });
+    row.querySelector('[data-a="deny"]').addEventListener("click", () => { room.deny(pid); renderWaiting(); });
+    list.appendChild(row);
+  }
+  const all = document.createElement("button");
+  all.className = "btn small primary";
+  all.textContent = "✔ Admit all";
+  all.addEventListener("click", () => { room.admitAll(); renderWaiting(); });
+  list.appendChild(all);
+}
+
+/* floating emoji reactions (teacher sees student reactions fly up) */
+function flyEmoji(emoji, name) {
+  const el = document.createElement("div");
+  el.style.cssText = "position:fixed;z-index:9998;font-size:34px;pointer-events:none;left:" +
+    (12 + Math.random() * 70) + "%;bottom:70px;transition:all 2.6s ease-out;opacity:1";
+  el.innerHTML = emoji + (name ? '<div style="font-size:11px;text-align:center;color:#fff;text-shadow:0 1px 3px #000">' + escapeHtml(name) + "</div>" : "");
+  document.body.appendChild(el);
+  requestAnimationFrame(() => { el.style.bottom = "75%"; el.style.opacity = "0"; });
+  setTimeout(() => el.remove(), 2700);
+}
+
+/* hook v4 events into the room event stream */
+const _v3OnRoomEvent = onRoomEvent;
+onRoomEvent = function (type, p) {
+  _v3OnRoomEvent(type, p);
+  if (type === "waiting") { renderWaiting(); toast("🚪 " + p.name + " is waiting — open 👥 to admit", "", 6000); }
+  if (type === "reaction") flyEmoji(p.emoji, p.name);
+  if (type === "student-joined" || type === "student-left") renderWaiting();
+};
+
+/* spotlight a student from the roster (long-press name = spotlight) */
+document.addEventListener("dblclick", (e) => {
+  const row = e.target.closest && e.target.closest("#rosterList .stu-row");
+  if (!row || !room) return;
+  const name = row.querySelector(".name").textContent;
+  room.spotlight(null, name);
+  toast("🌟 Spotlighted " + name + " — students see a banner");
+});
 
 /* ------------------------------------------------------------
    v3.6 Keyboard shortcuts (USB/Bluetooth keyboard friendly)
