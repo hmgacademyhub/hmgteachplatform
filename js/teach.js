@@ -20,7 +20,7 @@ if (window.pdfjsLib) {
 /* ------------------------------------------------------------
    1. Pane / app management
    ------------------------------------------------------------ */
-const APPS = ["board", "pdf", "web", "notes", "image", "graph", "video"];
+const APPS = ["board", "pdf", "web", "notes", "image", "graph", "video", "toolkit"];
 const paneState = {
   L: { app: Store.get("pane_L", "board"), instances: {} },
   R: { app: Store.get("pane_R", "pdf"),   instances: {} }
@@ -74,6 +74,43 @@ function initApp(side, app, inst) {
   else if (app === "image") initImage(side, inst);
   else if (app === "graph") initGraph(side, inst);   // v4
   else if (app === "video") initVideo(side, inst);   // v4
+  else if (app === "toolkit") initToolkit(side, inst); // v5
+}
+
+/* ---- v5: educational toolkit pane ---- */
+function initToolkit(side, inst) {
+  const el = inst.el;
+  const tk = new Toolkit($(".tk-stage", el), { mode: "periodic" });
+  inst.tk = tk;
+  inst.getCanvas = () => tk.canvas;
+  const convbar = $(".tk-convbar", el), multbar = $(".tk-multbar", el);
+  const catSel = $(".tk-cat", el), fromSel = $(".tk-from", el), toSel = $(".tk-to", el);
+
+  catSel.innerHTML = Object.keys(CONV).map((c) => `<option>${c}</option>`).join("");
+  function fillUnits() {
+    const cat = catSel.value;
+    const us = CONV[cat].special ? CONV[cat].units : Object.keys(CONV[cat].units);
+    fromSel.innerHTML = us.map((u) => `<option>${u}</option>`).join("");
+    toSel.innerHTML = us.map((u) => `<option>${u}</option>`).join("");
+    toSel.selectedIndex = Math.min(1, us.length - 1);
+    syncConv();
+  }
+  function syncConv() {
+    tk.convState = { cat: catSel.value, from: fromSel.value, to: toSel.value, val: $(".tk-val", el).value };
+    tk.draw();
+  }
+  fillUnits();
+  catSel.addEventListener("change", fillUnits);
+  [fromSel, toSel].forEach((s) => s.addEventListener("change", syncConv));
+  $(".tk-val", el).addEventListener("input", syncConv);
+  $(".tk-multn", el).addEventListener("change", (e) => { tk.multSize = Number(e.target.value); tk.multSel = null; tk.draw(); });
+
+  $(".tk-mode", el).addEventListener("change", (e) => {
+    const m = e.target.value;
+    convbar.classList.toggle("hide", m !== "convert");
+    multbar.classList.toggle("hide", m !== "mult");
+    tk.setMode(m);
+  });
 }
 
 /* ---- whiteboard ---- */
@@ -143,6 +180,20 @@ function initPdf(side, inst) {
   let doc = null, pageNum = 1, scale = 1, fitMode = true, rendering = false, pending = null;
 
   inst.getCanvas = () => (doc ? canvas : null);
+  /* v5 (issue 5): expose the VISIBLE viewport so the broadcast mirrors
+     exactly what the teacher sees (zoom + scroll position included). */
+  inst.getViewportRegion = () => {
+    if (!doc || !canvas.width) return null;
+    const scroll = $(".pdf-scroll", el);
+    const ratio = canvas.width / (parseFloat(canvas.style.width) || canvas.width);
+    const margin = 14 * ratio;
+    const sx = Math.max(0, scroll.scrollLeft * ratio - margin);
+    const sy = Math.max(0, scroll.scrollTop * ratio - margin);
+    const sw = Math.min(canvas.width - sx, scroll.clientWidth * ratio);
+    const sh = Math.min(canvas.height - sy, scroll.clientHeight * ratio);
+    if (sw <= 0 || sh <= 0) return null;
+    return { sx, sy, sw, sh };
+  };
 
   async function renderPage() {
     if (!doc) return;
@@ -644,7 +695,7 @@ function drawPaneInto(ctx, side, x, y, w, h, headH) {
   ctx.fillStyle = "#eef1ff";
   ctx.font = "bold 15px system-ui, sans-serif";
   ctx.textBaseline = "middle";
-  const titles = { board: "✏ Whiteboard", pdf: "📄 Learning material", web: "🌐 Web resource", notes: "🗒 Notes", image: "🖼 Image", graph: "📈 Graph", video: "🎬 Video" };
+  const titles = { board: "✏ Whiteboard", pdf: "📄 Learning material", web: "🌐 Web resource", notes: "🗒 Notes", image: "🖼 Image", graph: "📈 Graph", video: "🎬 Video", toolkit: "🧰 Toolkit" };
   ctx.fillText(titles[st.app] || st.app, x + 12, y + headH / 2);
 
   const cx = x, cy = y + headH, cw = w, ch = h - headH;
@@ -659,13 +710,28 @@ function drawPaneInto(ctx, side, x, y, w, h, headH) {
     } else if (st.app === "pdf" && inst) {
       const c = inst.getCanvas && inst.getCanvas();
       if (c && c.width) {
-        const s = Math.min(cw / c.width, ch / c.height);
-        const dw = c.width * s, dh = c.height * s;
-        const dx = cx + (cw - dw) / 2, dy = cy + (ch - dh) / 2;
+        /* v5 (issue 5): broadcast the VISIBLE region — students now see the
+           same zoom level and scroll position as the teacher. */
         ctx.fillStyle = "#383d52"; ctx.fillRect(cx, cy, cw, ch);
-        ctx.drawImage(c, dx, dy, dw, dh);
-        const ac = inst.getAnnotCanvas && inst.getAnnotCanvas();   // v2: annotations over PDF
-        if (ac && ac.width) ctx.drawImage(ac, dx, dy, dw, dh);
+        const region = inst.getViewportRegion && inst.getViewportRegion();
+        if (region) {
+          const s = Math.min(cw / region.sw, ch / region.sh);
+          const dw = region.sw * s, dh = region.sh * s;
+          const dx = cx + (cw - dw) / 2, dy = cy + (ch - dh) / 2;
+          ctx.drawImage(c, region.sx, region.sy, region.sw, region.sh, dx, dy, dw, dh);
+          const ac = inst.getAnnotCanvas && inst.getAnnotCanvas();
+          if (ac && ac.width) {
+            const kx = ac.width / c.width, ky = ac.height / c.height;
+            ctx.drawImage(ac, region.sx * kx, region.sy * ky, region.sw * kx, region.sh * ky, dx, dy, dw, dh);
+          }
+        } else {
+          const s = Math.min(cw / c.width, ch / c.height);
+          const dw = c.width * s, dh = c.height * s;
+          const dx = cx + (cw - dw) / 2, dy = cy + (ch - dh) / 2;
+          ctx.drawImage(c, dx, dy, dw, dh);
+          const ac = inst.getAnnotCanvas && inst.getAnnotCanvas();
+          if (ac && ac.width) ctx.drawImage(ac, dx, dy, dw, dh);
+        }
       } else drawPlaceholder(ctx, cx, cy, cw, ch, "No PDF open yet");
     } else if (st.app === "notes" && inst) {
       ctx.fillStyle = "#fffbe8"; ctx.fillRect(cx, cy, cw, ch);
@@ -679,10 +745,10 @@ function drawPaneInto(ctx, side, x, y, w, h, headH) {
       const dw = im.naturalWidth * s, dh = im.naturalHeight * s;
       ctx.fillStyle = "#383d52"; ctx.fillRect(cx, cy, cw, ch);
       ctx.drawImage(im, cx + (cw - dw) / 2, cy + (ch - dh) / 2, dw, dh);
-    } else if (st.app === "graph" && inst) {                       // v4
-      const c = inst.getCanvas && inst.getCanvas();
+    } else if (st.app === "graph" || st.app === "toolkit") {       // v4/v5
+      const c = inst && inst.getCanvas && inst.getCanvas();
       if (c && c.width) ctx.drawImage(c, cx, cy, cw, ch);
-      else drawPlaceholder(ctx, cx, cy, cw, ch, "No graph yet");
+      else drawPlaceholder(ctx, cx, cy, cw, ch, st.app === "graph" ? "No graph yet" : "Toolkit loading…");
     } else if (st.app === "video" && inst && inst.videoEl && inst.videoEl.videoWidth) {  // v4
       const vEl = inst.videoEl;
       const s = Math.min(cw / vEl.videoWidth, ch / vEl.videoHeight);
@@ -768,6 +834,19 @@ $("#roomInfo").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(studentLink()); toast("Student link copied!", "ok"); } catch {}
 });
 
+/* v5 (issue 6): multi-teacher support. Every browser/device generates its OWN
+   room code, so any number of teachers can run classes simultaneously on the
+   same deployment — rooms are fully isolated (separate peer IDs, separate
+   star networks). This button gives the current device a fresh room instantly
+   (e.g. two teachers sharing one tablet, or running parallel classes). */
+$("#btnNewRoom").addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (room && room.students && room.students.size > 0) { toast("End the current class first.", "err"); return; }
+  if (!confirm("Generate a NEW room code? Old invite links will stop working.")) return;
+  Store.set("roomcode", randomCode());
+  location.reload();
+});
+
 /* ---- go live / end ---- */
 $("#btnGoLive").addEventListener("click", goLive);
 $("#btnEndLive").addEventListener("click", endLive);
@@ -778,6 +857,8 @@ async function goLive() {
   try {
     room = new TeacherRoom(roomCode, { onEvent: onRoomEvent });
     room.roomName = Store.get("roomname", "") || ("Class " + roomCode);
+    room.pin = Store.get("pin", "");        /* v5 bug-fix: PIN applied atomically
+                                               (was a setTimeout race in v4) */
     await room.start();
 
     // build the stage stream
@@ -817,6 +898,7 @@ async function goLive() {
 
     window._wantWake = Store.get("wake", true);
     if (window._wantWake) keepAwake(true);
+    Store.set("wasLive", true);   /* v5 (issue 3): remember we were live */
     toast("You are LIVE. Share the invite link with students.", "ok", 5000);
   } catch (e) {
     toast(e.message || "Could not start class", "err", 6000);
@@ -878,6 +960,7 @@ $("#btnCam").addEventListener("click", async () => {
 
 function endLive() {
   if (!confirm("End the class for everyone?")) return;
+  Store.set("wasLive", false);   /* v5: deliberate end — don't auto-resume */
   if (room) { room.end(); }
   if (COMP.raf) cancelAnimationFrame(COMP.raf);
   if (recorder && recorder.state !== "inactive") stopRecording();
@@ -893,6 +976,7 @@ function endLive() {
 
 /* ---- room events ---- */
 const camTiles = new Map();
+let lastPrivatePeer = null;   /* v5: most recent private-chat sender */
 function onRoomEvent(type, p) {
   switch (type) {
     case "student-joined":
@@ -909,13 +993,24 @@ function onRoomEvent(type, p) {
       if (p.up) toast("✋ " + p.name + " raised a hand", "", 4500);
       renderRoster();
       break;
-    case "chat": addChatMsg(p.from, p.text, false); break;
+    case "chat":
+      addChatMsg(p.private ? "🔒 " + p.from + " (private)" : p.from, p.text, false);
+      if (p.private && p.peerId) lastPrivatePeer = p.peerId;   /* v5: reply target */
+      break;
     case "student-media":
       if (p.kind === "stucam") addCamTile(p.peerId, p.name, p.stream);
       if (p.kind === "stumic") playStudentAudio(p.peerId, p.stream);
+      if (p.kind === "stuscreen") {                    /* v5 (issue 1) */
+        addCamTile("scr-" + p.peerId, "🖥 " + p.name + " (screen)", p.stream);
+        const tile = camTiles.get("scr-" + p.peerId);
+        if (tile) tile.classList.add("focus");          // screens open enlarged
+        toast("🖥 " + p.name + " is sharing their screen — see 👥 drawer", "ok", 5000);
+        if (!$("#drawerStudents").classList.contains("open")) toggleDrawer("#drawerStudents");
+      }
       break;
     case "student-media-end":
       if (p.kind === "stucam") removeCamTile(p.peerId);
+      if (p.kind === "stuscreen") removeCamTile("scr-" + p.peerId);
       break;
     case "poll-update": renderPollBars(p); break;
     case "signal":
@@ -940,6 +1035,7 @@ function renderRoster() {
       <span class="hand">${stu.hand ? "✋" : ""}</span>
       <span class="name">${escapeHtml(stu.name)}</span>
       <button class="btn small" data-act="cam" title="Ask/stop camera">📷</button>
+      <button class="btn small" data-act="scr" title="Ask student to share their screen">🖥</button>
       <button class="btn small" data-act="mic" title="Allow/revoke mic">🎙</button>
       <button class="btn small danger" data-act="kick" title="Remove">✕</button>`;
     row.querySelector('[data-act="cam"]').addEventListener("click", (e) => {
@@ -948,6 +1044,13 @@ function renderRoster() {
       b.classList.toggle("active", on);
       room.requestStudentCam(pid, on);
       toast(on ? "Asked " + stu.name + " to turn camera on" : "Asked " + stu.name + " to turn camera off");
+    });
+    row.querySelector('[data-act="scr"]').addEventListener("click", (e) => {  /* v5 */
+      const b = e.currentTarget;
+      const on = !b.classList.contains("active");
+      b.classList.toggle("active", on);
+      room.requestStudentScreen(pid, on);
+      toast(on ? "Asked " + stu.name + " to share their screen" : "Asked " + stu.name + " to stop sharing");
     });
     row.querySelector('[data-act="mic"]').addEventListener("click", (e) => {
       const b = e.currentTarget;
@@ -1011,8 +1114,14 @@ function sendTeacherChat() {
   const text = inp.value.trim();
   if (!text) return;
   inp.value = "";
-  addChatMsg("You (Teacher)", text, true);
-  if (room) room.sendChat(text);
+  const priv = $("#chatPrivReply").checked && lastPrivatePeer;   /* v5 */
+  if (priv && room) {
+    room.sendChatTo(lastPrivatePeer, text);
+    addChatMsg("You → student (private)", text, true);
+  } else {
+    addChatMsg("You (Teacher)", text, true);
+    if (room) room.sendChat(text);
+  }
 }
 $("#chatSend").addEventListener("click", sendTeacherChat);
 $("#chatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") sendTeacherChat(); });
@@ -1197,6 +1306,27 @@ if (new URLSearchParams(location.search).get("solo") === "1") {
 window.addEventListener("beforeunload", (e) => {
   if (room && room.students && room.students.size > 0) { e.preventDefault(); e.returnValue = ""; }
 });
+
+/* ------------------------------------------------------------
+   v5 (issue 3): CLASS AUTO-RESUME.
+   If the studio reloads (accidental refresh, crash, tablet
+   restart) while a class was live, offer one-tap resume of the
+   SAME room. Students' auto-reconnect (join.js) then snaps
+   everyone back together — the class continues seamlessly.
+   ------------------------------------------------------------ */
+if (Store.get("wasLive", false) && !meetModeCheck()) {
+  setTimeout(() => {
+    const bar = document.createElement("div");
+    bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9000;background:#1d6f42;color:#fff;display:flex;gap:10px;align-items:center;justify-content:center;padding:9px;font-size:14px;flex-wrap:wrap";
+    bar.innerHTML = '<b>⚡ Your class was interrupted.</b> Students are waiting and will reconnect automatically. ' +
+      '<button id="resumeYes" class="btn small ok">▶ Resume class now</button>' +
+      '<button id="resumeNo" class="btn small">Dismiss</button>';
+    document.body.appendChild(bar);
+    $("#resumeYes").addEventListener("click", () => { bar.remove(); goLive(); });
+    $("#resumeNo").addEventListener("click", () => { Store.set("wasLive", false); bar.remove(); });
+  }, 800);
+}
+function meetModeCheck() { return new URLSearchParams(location.search).get("meet") === "1"; }
 
 /* ============================================================
    v2 FEATURES
@@ -1788,11 +1918,9 @@ function applyBranding() {
 }
 applyBranding();
 
-/* apply pin to room when going live (wrap goLive side-effect) */
-const _origGoLiveBtn = $("#btnGoLive");
-_origGoLiveBtn.addEventListener("click", () => {
-  setTimeout(() => { if (room) room.pin = Store.get("pin", ""); }, 1200);
-});
+/* v5: PIN is now applied inside goLive() itself (race-free). Changing the PIN
+   in Settings while live applies immediately too: */
+$("#setSave").addEventListener("click", () => { if (room) room.pin = Store.get("pin", ""); });
 
 /* branding in the composite watermark */
 const _origDrawComposite = drawComposite;

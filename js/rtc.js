@@ -157,11 +157,18 @@ class TeacherRoom {
     const stu = this.students.get(conn.peer);
     if (!stu || !d || typeof d !== "object") return;
     switch (d.t) {
-      case "chat":
+      case "chat": {
         this.stats.chats++;                                      // v3: analytics
-        this.onEvent("chat", { from: stu.name, text: String(d.text).slice(0, 1000) });
-        this.broadcast({ t: "chat", from: stu.name, text: String(d.text).slice(0, 1000) }, conn.peer);
+        const text = String(d.text).slice(0, 1000);
+        /* v5: private chat — student → teacher only (not relayed to class) */
+        if (d.private) {
+          this.onEvent("chat", { from: stu.name, text, private: true, peerId: conn.peer });
+        } else {
+          this.onEvent("chat", { from: stu.name, text });
+          this.broadcast({ t: "chat", from: stu.name, text }, conn.peer);
+        }
         break;
+      }
       case "quizAnswer": {                                       // v3: quiz engine
         const q = this.activeQuiz;
         if (!q || q.answered.has(conn.peer)) break;
@@ -212,6 +219,8 @@ class TeacherRoom {
   _dropStudent(peerId) {
     const stu = this.students.get(peerId);
     if (!stu) return;
+    /* v5 bug-fix: close lingering media calls (was a memory/connection leak) */
+    for (const call of stu.mediaCalls) { try { call.close(); } catch {} }
     this.attendance.push({ name: stu.name, event: "left", time: nowStamp() });
     this.students.delete(peerId);
     this._broadcastRoster();
@@ -262,12 +271,20 @@ class TeacherRoom {
     const stu = this.students.get(peerId);
     if (stu) try { stu.conn.send({ t: "camRequest", on }); } catch {}
   }
+  requestStudentScreen(peerId, on) {   // v5: ask a student to share their screen
+    const stu = this.students.get(peerId);
+    if (stu) try { stu.conn.send({ t: "screenRequest", on }); } catch {}
+  }
   allowMic(peerId, on) {
     const stu = this.students.get(peerId);
     if (stu) try { stu.conn.send({ t: "micAllow", on }); } catch {}
   }
   sendAnnouncement(text) { this.broadcast({ t: "announce", text }); }
   sendChat(text) { this.broadcast({ t: "chat", from: "Teacher", text }); }
+  sendChatTo(peerId, text) {   /* v5: private teacher → one student */
+    const stu = this.students.get(peerId);
+    if (stu) try { stu.conn.send({ t: "chat", from: "Teacher (private)", text, private: true }); } catch {}
+  }
 
   /* ----- polls ----- */
   startPoll(question, options) {
@@ -418,6 +435,7 @@ class StudentRoom {
       case "quizFeedback": this.onEvent("quizFeedback", d); break;      // v3
       case "quizEnd":   this.onEvent("quizEnd", d.leaderboard); break;  // v3
       case "camRequest":this.onEvent("camRequest", d); break;
+      case "screenRequest": this.onEvent("screenRequest", d); break;  // v5
       case "micAllow":  this.onEvent("micAllow", d); break;
       case "teachercam-off": this.onEvent("media-end", { kind: "teachercam" }); break;
       case "kicked":    this.onEvent("kicked"); break;
@@ -448,6 +466,26 @@ class StudentRoom {
     });
     this._camStream = stream;
     this.camCall = this.peer.call(RTC_PREFIX + this.code + "-host", stream, { metadata: { kind: "stucam" } });
+    return stream;
+  }
+
+  /* v5 (issue 1): student screen share — sent to the teacher as "stuscreen" */
+  async shareScreen(on) {
+    if (!on) {
+      if (this.screenCall) { try { this.screenCall.close(); } catch {} this.screenCall = null; }
+      if (this._screenStream) { this._screenStream.getTracks().forEach((t) => t.stop()); this._screenStream = null; }
+      return null;
+    }
+    if (!navigator.mediaDevices.getDisplayMedia) throw new Error("Screen sharing is not supported on this browser.");
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: { ideal: 8 } }, audio: false
+    });
+    this._screenStream = stream;
+    stream.getVideoTracks()[0].addEventListener("ended", () => {
+      this.shareScreen(false);
+      this.onEvent("screenEnded");
+    });
+    this.screenCall = this.peer.call(RTC_PREFIX + this.code + "-host", stream, { metadata: { kind: "stuscreen" } });
     return stream;
   }
 

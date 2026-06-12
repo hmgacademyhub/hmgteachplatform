@@ -15,8 +15,8 @@ if (qs.get("room")) $("#inRoom").value = qs.get("room").toUpperCase();
 $("#inName").value = Store.get("stuname", "");
 
 /* ---------- join flow ---------- */
-$("#btnJoin").addEventListener("click", join);
-$("#inName").addEventListener("keydown", (e) => { if (e.key === "Enter") join(); });
+$("#btnJoin").addEventListener("click", () => { lobbyOn ? stopLobby() : join(); });
+$("#inName").addEventListener("keydown", (e) => { if (e.key === "Enter" && !lobbyOn) join(); });
 
 async function join() {
   const code = $("#inRoom").value.trim().toUpperCase();
@@ -33,9 +33,49 @@ async function join() {
     await sRoom.join();
     enterStage();
   } catch (e) {
-    $("#joinStatus").textContent = "❌ " + e.message;
-    $("#btnJoin").disabled = false;
+    /* v5 (issue 2): LOBBY — if the class is not live yet, wait politely and
+       keep retrying until the teacher goes live. No more "join failed". */
+    try { sRoom.leave(); } catch {}
+    startLobby(code, name, e.message);
   }
+}
+
+/* ---------- v5: lobby (auto-join when teacher goes live) ---------- */
+let lobbyTimer = null, lobbyOn = false;
+function startLobby(code, name, why) {
+  lobbyOn = true;
+  $("#joinStatus").innerHTML = "🕐 <b>You're in the lobby.</b> " +
+    (why && why.includes("PIN") ? escapeHtml(why) :
+    "The class hasn't started yet — this page will join you automatically the moment your teacher goes live. Keep it open.");
+  $("#btnJoin").textContent = "✕ Stop waiting";
+  $("#btnJoin").disabled = false;
+  window._wantWake = true; keepAwake(true);
+  const tick = async () => {
+    if (!lobbyOn) return;
+    sRoom = new StudentRoom(code, name, { onEvent: onEvent, pin: $("#inPin").value.trim() });
+    try {
+      await sRoom.join();
+      lobbyOn = false;
+      restoreJoinButton();
+      toast("🎉 Your teacher is live — joining now!", "ok");
+      enterStage();
+    } catch {
+      try { sRoom.leave(); } catch {}
+      lobbyTimer = setTimeout(tick, 8000);   // retry every 8 s
+    }
+  };
+  lobbyTimer = setTimeout(tick, 4000);
+}
+function stopLobby() {
+  lobbyOn = false;
+  clearTimeout(lobbyTimer);
+  restoreJoinButton();
+  $("#joinStatus").textContent = "Stopped waiting. Tap Join class to try again.";
+  window._wantWake = false; keepAwake(false);
+}
+function restoreJoinButton() {
+  $("#btnJoin").textContent = "Join class ➜";
+  $("#btnJoin").disabled = false;
 }
 
 function enterStage() {
@@ -97,6 +137,15 @@ function onEvent(type, p) {
       toast("🌟 " + p.name + ", it's your turn!", "ok", 6000);
       break;
     case "camRequest": handleCamRequest(p.on); break;
+    case "screenRequest":                              /* v5 */
+      if (p.on && !myScreenOn) {
+        if (confirm("Your teacher asks you to SHARE YOUR SCREEN (e.g. to show your work). Allow?")) toggleMyScreen();
+      } else if (!p.on && myScreenOn) { toggleMyScreen(); }
+      break;
+    case "screenEnded":
+      myScreenOn = false;
+      $("#sBtnScreen").classList.remove("active");
+      break;
     case "micAllow":
       micAllowed = p.on;
       $("#sBtnMic").disabled = !p.on;
@@ -204,8 +253,9 @@ function sendChat() {
   const text = inp.value.trim();
   if (!text) return;
   inp.value = "";
-  sRoom.sendChat(text);
-  addMsg("You", text, true);
+  const priv = $("#sChatPriv").checked;       /* v5: private chat */
+  sRoom.send({ t: "chat", text, private: priv });
+  addMsg(priv ? "You → teacher (private)" : "You", text, true);
 }
 $("#sChatSend").addEventListener("click", sendChat);
 $("#sChatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat(); });
@@ -244,6 +294,27 @@ function handleCamRequest(on) {
   } else if (!on && myCamOn) {
     toggleMyCam();
     toast("Teacher turned your camera off");
+  }
+}
+
+/* v5 (issue 1): student screen sharing — show your work to the teacher */
+let myScreenOn = false;
+$("#sBtnScreen").addEventListener("click", toggleMyScreen);
+async function toggleMyScreen() {
+  try {
+    if (!myScreenOn) {
+      await sRoom.shareScreen(true);
+      myScreenOn = true;
+      $("#sBtnScreen").classList.add("active");
+      toast("🖥 You are sharing your screen with the teacher", "ok", 5000);
+    } else {
+      await sRoom.shareScreen(false);
+      myScreenOn = false;
+      $("#sBtnScreen").classList.remove("active");
+      toast("Screen sharing stopped");
+    }
+  } catch (e) {
+    toast(e.message || "Screen share blocked. On phones use Chrome/Edge; some browsers don't allow it.", "err", 6000);
   }
 }
 
@@ -352,19 +423,42 @@ function showQuizLeaderboard(rows) {
   setTimeout(() => closeModal("#mQuiz"), 9000);
 }
 
-/* ---------- reconnect / cleanup ---------- */
+/* ---------- reconnect / cleanup ----------
+   v5 (issue 3): PROFESSIONAL RECONNECT. If the teacher's connection drops
+   (left the app, network blip, tablet restart), students stay on the stage
+   with a "reconnecting" banner and silently retry for up to 10 MINUTES.
+   The moment the teacher is back live (same room code), everyone is
+   reconnected automatically — nobody has to rejoin manually. */
 let rejoinTries = 0;
+const REJOIN_MAX_TRIES = 75;            // ~10 min with capped backoff
+let rejoinBanner = null;
+function showRejoinBanner() {
+  if (rejoinBanner) return;
+  rejoinBanner = document.createElement("div");
+  rejoinBanner.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9000;background:#b7791f;color:#fff;text-align:center;padding:8px;font-size:14px;font-weight:600";
+  rejoinBanner.textContent = "📡 Connection to the teacher lost — reconnecting automatically… stay on this page";
+  document.body.appendChild(rejoinBanner);
+}
+function hideRejoinBanner() { if (rejoinBanner) { rejoinBanner.remove(); rejoinBanner = null; } }
+
 async function attemptRejoin() {
-  if (rejoinTries >= 4) { cleanupAndGate("Could not reconnect. Tap Join to try again."); return; }
+  if (rejoinTries >= REJOIN_MAX_TRIES) {
+    hideRejoinBanner();
+    cleanupAndGate("Could not reconnect after several minutes. Tap Join class to try again.");
+    return;
+  }
   rejoinTries++;
+  showRejoinBanner();
   const code = $("#inRoom").value.trim().toUpperCase();
   const name = Store.get("stuname", "Student");
-  await new Promise((r) => setTimeout(r, 2500 * rejoinTries));
+  await new Promise((r) => setTimeout(r, Math.min(8000, 2000 + rejoinTries * 500)));
   try {
+    try { sRoom && sRoom.leave(); } catch {}
     sRoom = new StudentRoom(code, name, { onEvent: onEvent, pin: $("#inPin").value.trim() });
     await sRoom.join();
     rejoinTries = 0;
-    toast("Reconnected ✔", "ok");
+    hideRejoinBanner();
+    toast("✅ Reconnected to the class!", "ok");
   } catch { attemptRejoin(); }
 }
 
