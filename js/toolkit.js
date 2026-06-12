@@ -120,13 +120,15 @@ class Toolkit {
        animal:   () => this._drawCell(false),
        units:    () => this._drawUnits(),
        convert:  () => this._drawConvert(),
-       mult:     () => this._drawMult() }[this.mode] || (() => {}))();
+       mult:     () => this._drawMult() }[this.mode] ||
+       (() => { if (this._drawExt) this._drawExt(); }))();
   }
 
   _tap(e) {
     const r = this.canvas.getBoundingClientRect();
     const dpr = this.canvas.width / r.width;
     const x = (e.clientX - r.left) * dpr, y = (e.clientY - r.top) * dpr;
+    if (this._tapExt && this._tapExt(x, y)) return;     // v6 extension hook
     if (this.mode === "periodic") {
       if (this.selElement) { this.selElement = null; this.draw(); return; }
       const g = this._ptGeom();

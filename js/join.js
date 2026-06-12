@@ -403,12 +403,15 @@ function showQuiz(q) {
 function showQuizFeedback(d) {
   const fb = $("#sQuizFb");
   fb.classList.remove("hide");
-  if (d.correct) { fb.textContent = "✅ Correct! Points added."; fb.style.color = "var(--ok)"; }
+  let html;
+  if (d.correct) { html = "✅ Correct! Points added."; fb.style.color = "var(--ok)"; }
   else {
     const letter = String.fromCharCode(65 + Number(d.correctIndex));
-    fb.textContent = "❌ Not quite — the answer was " + letter + ".";
+    html = "❌ Not quite — the answer was " + letter + ".";
     fb.style.color = "var(--danger)";
   }
+  fb.innerHTML = escapeHtml(html) +
+    (d.explanation ? '<div style="font-weight:400;font-size:13px;color:var(--text-dim);margin-top:6px">💡 ' + escapeHtml(d.explanation) + "</div>" : "");
 }
 function showQuizLeaderboard(rows) {
   clearInterval(quizTimerInt);

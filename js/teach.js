@@ -77,15 +77,24 @@ function initApp(side, app, inst) {
   else if (app === "toolkit") initToolkit(side, inst); // v5
 }
 
-/* ---- v5: educational toolkit pane ---- */
+/* ---- v5/v6: educational toolkit pane (100+ tools) ---- */
 function initToolkit(side, inst) {
   const el = inst.el;
-  const tk = new Toolkit($(".tk-stage", el), { mode: "periodic" });
+  const tk = new Toolkit($(".tk-stage", el), { mode: "construct" });
   inst.tk = tk;
   inst.getCanvas = () => tk.canvas;
-  const convbar = $(".tk-convbar", el), multbar = $(".tk-multbar", el);
-  const catSel = $(".tk-cat", el), fromSel = $(".tk-from", el), toSel = $(".tk-to", el);
+  tk._extInit();
+  tk.bindConstructPointers();
 
+  const bars = {
+    convert: ".tk-convbar", mult: ".tk-multbar", construct: ".tk-conbar",
+    numline: ".tk-nlbar", fraction: ".tk-frbar", random: ".tk-rndbar",
+    tally: ".tk-tallybar", score: ".tk-scbar", balance: ".tk-balbar",
+    hundred: ".tk-hsbar", letters: ".tk-ltbar", cards: ".tk-cardbar"
+  };
+
+  /* ---- unit converter (v5) ---- */
+  const catSel = $(".tk-cat", el), fromSel = $(".tk-from", el), toSel = $(".tk-to", el);
   catSel.innerHTML = Object.keys(CONV).map((c) => `<option>${c}</option>`).join("");
   function fillUnits() {
     const cat = catSel.value;
@@ -105,12 +114,110 @@ function initToolkit(side, inst) {
   $(".tk-val", el).addEventListener("input", syncConv);
   $(".tk-multn", el).addEventListener("change", (e) => { tk.multSize = Number(e.target.value); tk.multSel = null; tk.draw(); });
 
+  /* ---- v6: construction toolbar ---- */
+  $$(".tk-con", el).forEach((b) => b.addEventListener("click", () => {
+    $$(".tk-con", el).forEach((x) => x.classList.remove("active"));
+    b.classList.add("active");
+    tk.constructSetTool(b.dataset.ct);
+  }));
+  $(".tk-con-undo", el).addEventListener("click", () => tk.constructUndo());
+  $(".tk-con-clear", el).addEventListener("click", () => { if (confirm("Clear the construction?")) tk.constructClear(); });
+
+  /* ---- v6: number line ---- */
+  function syncNl() {
+    const n = tk._ext.nl;
+    n.min = Number($(".tk-nlmin", el).value);
+    n.max = Number($(".tk-nlmax", el).value);
+    if (n.max <= n.min) n.max = n.min + 1;
+    n.step = Number($(".tk-nlstep", el).value);
+    n.marks = [];
+    tk.draw();
+  }
+  [".tk-nlmin", ".tk-nlmax", ".tk-nlstep"].forEach((s) => $(s, el).addEventListener("change", syncNl));
+
+  /* ---- v6: fractions ---- */
+  function syncFr() {
+    const f = tk._ext.fr;
+    f.n1 = Math.max(0, Number($(".tk-fn1", el).value));
+    f.d1 = Math.max(1, Number($(".tk-fd1", el).value));
+    f.n2 = Math.max(0, Number($(".tk-fn2", el).value));
+    f.d2 = Math.max(1, Number($(".tk-fd2", el).value));
+    f.mode = $(".tk-frmode", el).value;
+    tk.draw();
+  }
+  [".tk-fn1", ".tk-fd1", ".tk-fn2", ".tk-fd2", ".tk-frmode"].forEach((s) => $(s, el).addEventListener("input", syncFr));
+
+  /* ---- v6: randomisers ---- */
+  $(".tk-rndmode", el).addEventListener("change", (e) => { tk._ext.rnd.mode = e.target.value; tk.draw(); });
+  $(".tk-dicen", el).addEventListener("change", (e) => {
+    tk._ext.rnd.dice = Array.from({ length: Number(e.target.value) }, () => 1 + Math.floor(Math.random() * 6));
+    tk.draw();
+  });
+  $(".tk-names", el).addEventListener("change", (e) => {
+    tk._ext.rnd.names = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+    tk._ext.rnd.picked = "";
+    tk.draw();
+  });
+
+  /* ---- v6: tally ---- */
+  $(".tk-tallyset", el).addEventListener("click", () => {
+    const items = $(".tk-tallyitems", el).value.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 6);
+    if (items.length >= 2) { tk._ext.tally.items = items.map((n) => [n, 0]); tk.draw(); }
+  });
+
+  /* ---- v6: scoreboard ---- */
+  $(".tk-scn", el).addEventListener("change", (e) => { tk._ext.sc.n = Number(e.target.value); tk.draw(); });
+  $(".tk-scnames", el).addEventListener("change", (e) => {
+    e.target.value.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 4)
+      .forEach((n, i) => { tk._ext.sc.teams[i][0] = n; });
+    tk.draw();
+  });
+  $(".tk-screset", el).addEventListener("click", () => { tk._ext.sc.teams.forEach((t) => (t[1] = 0)); tk.draw(); });
+
+  /* ---- v6: balance ---- */
+  $(".tk-balset", el).addEventListener("click", () => {
+    tk.setBalance(Number($(".tk-balx", el).value) || 1,
+                  Number($(".tk-bala", el).value) || 0,
+                  Math.max(1, Number($(".tk-balm", el).value) || 1));
+  });
+
+  /* ---- v6: hundred square ---- */
+  $(".tk-hskip", el).addEventListener("change", (e) => { tk._ext.hs.skip = Number(e.target.value); tk.draw(); });
+  $(".tk-hsclear", el).addEventListener("click", () => { tk._ext.hs.marks.clear(); tk.draw(); });
+
+  /* ---- v6: letters ---- */
+  const SEQ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  $(".tk-ltchar", el).addEventListener("input", (e) => {
+    if (e.target.value) { tk._ext.lt.char = e.target.value; tk.draw(); }
+  });
+  $(".tk-ltprev", el).addEventListener("click", () => {
+    const i = SEQ.indexOf(tk._ext.lt.char.toUpperCase());
+    tk._ext.lt.char = SEQ[(i - 1 + SEQ.length) % SEQ.length];
+    $(".tk-ltchar", el).value = tk._ext.lt.char;
+    tk.draw();
+  });
+  $(".tk-ltnext", el).addEventListener("click", () => {
+    const i = SEQ.indexOf(tk._ext.lt.char.toUpperCase());
+    tk._ext.lt.char = SEQ[(i + 1) % SEQ.length];
+    $(".tk-ltchar", el).value = tk._ext.lt.char;
+    tk.draw();
+  });
+
+  /* ---- v6: reference cards ---- */
+  $(".tk-cardcat", el).innerHTML = '<option>All</option>' + TK_CATS.map((c) => `<option>${c}</option>`).join("");
+  $(".tk-cardcat", el).addEventListener("change", (e) => { tk._ext.cd.cat = e.target.value; tk._ext.cd.idx = 0; tk.draw(); });
+  $(".tk-cardq", el).addEventListener("input", (e) => { tk._ext.cd.query = e.target.value; tk._ext.cd.idx = 0; tk.draw(); });
+  $(".tk-cardprev", el).addEventListener("click", () => tk._tapCards(0));
+  $(".tk-cardnext", el).addEventListener("click", () => tk._tapCards(1e9));
+
+  /* ---- mode switching ---- */
   $(".tk-mode", el).addEventListener("change", (e) => {
     const m = e.target.value;
-    convbar.classList.toggle("hide", m !== "convert");
-    multbar.classList.toggle("hide", m !== "mult");
+    Object.entries(bars).forEach(([mode, sel]) => $(sel, el).classList.toggle("hide", mode !== m));
     tk.setMode(m);
   });
+  /* show construct bar initially */
+  Object.entries(bars).forEach(([mode, sel]) => $(sel, el).classList.toggle("hide", mode !== "construct"));
 }
 
 /* ---- whiteboard ---- */
@@ -370,7 +477,9 @@ function initImage(side, inst) {
   el.addEventListener("dragover", (e) => e.preventDefault());
   el.addEventListener("drop", (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith("image/")) load(f); });
 
-  /* v4: pinch zoom the image — this pane only */
+  /* v4: pinch zoom the image — this pane only
+     v6 (issue 4): zoom level is exported so the BROADCAST shows the same zoom */
+  inst.getZoom = () => inst._zoom || 1;
   (function imgPinch() {
     const scroll = $(".img-scroll", el);
     let zoom = 1;
@@ -392,6 +501,7 @@ function initImage(side, inst) {
         const [a, b] = [...touches.values()];
         const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
         zoom = Math.min(6, Math.max(0.5, pin.z0 * (d / pin.d0)));
+        inst._zoom = zoom;
         img.style.transform = "scale(" + zoom + ")";
         img.style.transformOrigin = "center center";
         img.style.maxWidth = zoom > 1 ? "none" : "96%";
@@ -413,7 +523,14 @@ function initGraph(side, inst) {
   const ctx = canvas.getContext("2d");
   let curves = [];                                    // [{expr, fn, color}]
   let view = { cx: 0, cy: 0, w: 20 };                 // world width in units
-  const COLORS = ["#1565d8", "#e02b2b", "#0a8a3a", "#8b5cf6", "#f59e0b"];
+  /* v6 (issue 3): selectable backgrounds for visibility */
+  const GR_THEMES = {
+    light: { bg: "#ffffff", grid: "#e3e8f4", axis: "#7a86ad", label: "#5a6488", curves: ["#1565d8", "#e02b2b", "#0a8a3a", "#8b5cf6", "#f59e0b"] },
+    cream: { bg: "#fdf6e3", grid: "#e8dcc0", axis: "#8a7c55", label: "#6b5d3f", curves: ["#0b5ed7", "#c92a2a", "#087f5b", "#7048e8", "#e8590c"] },
+    dark:  { bg: "#10141f", grid: "#27314a", axis: "#8fa3d0", label: "#9aa9cf", curves: ["#4dabf7", "#ff6b6b", "#51cf66", "#b197fc", "#ffd43b"] },
+    board: { bg: "#173f2c", grid: "#225840", axis: "#a9d7bb", label: "#cfe9da", curves: ["#ffe066", "#ffa8a8", "#74c0fc", "#fff", "#ffc078"] }
+  };
+  let grTheme = Store.get("graph_bg", "light");
   inst.getCanvas = () => canvas;
 
   function compile(expr) {
@@ -442,22 +559,23 @@ function initGraph(side, inst) {
     const px = (x) => ((x - x0) / view.w) * W;
     const py = (y) => ((y0 - y) / wH) * H;
 
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
+    const TH = GR_THEMES[grTheme] || GR_THEMES.light;
+    ctx.fillStyle = TH.bg; ctx.fillRect(0, 0, W, H);
     // grid
     const step = niceStep(view.w / 10);
-    ctx.strokeStyle = "#e3e8f4"; ctx.lineWidth = 1;
+    ctx.strokeStyle = TH.grid; ctx.lineWidth = 1;
     ctx.beginPath();
     for (let gx = Math.ceil(x0 / step) * step; gx < x0 + view.w; gx += step) { ctx.moveTo(px(gx), 0); ctx.lineTo(px(gx), H); }
     for (let gy = Math.ceil((y0 - wH) / step) * step; gy < y0; gy += step) { ctx.moveTo(0, py(gy)); ctx.lineTo(W, py(gy)); }
     ctx.stroke();
     // axes
-    ctx.strokeStyle = "#7a86ad"; ctx.lineWidth = 2 * dpr;
+    ctx.strokeStyle = TH.axis; ctx.lineWidth = 2 * dpr;
     ctx.beginPath();
     ctx.moveTo(0, py(0)); ctx.lineTo(W, py(0));
     ctx.moveTo(px(0), 0); ctx.lineTo(px(0), H);
     ctx.stroke();
     // labels
-    ctx.fillStyle = "#5a6488"; ctx.font = (11 * dpr) + "px system-ui";
+    ctx.fillStyle = TH.label; ctx.font = (11 * dpr) + "px system-ui";
     for (let gx = Math.ceil(x0 / step) * step; gx < x0 + view.w; gx += step) {
       if (Math.abs(gx) > 1e-9) ctx.fillText(trimNum(gx), px(gx) + 3, py(0) + 14 * dpr);
     }
@@ -466,7 +584,8 @@ function initGraph(side, inst) {
     }
     // curves
     curves.forEach((c, ci) => {
-      ctx.strokeStyle = c.color; ctx.lineWidth = 2.4 * dpr;
+      const ccol = TH.curves[(c.ci !== undefined ? c.ci : ci) % TH.curves.length];
+      ctx.strokeStyle = ccol; ctx.lineWidth = 2.4 * dpr;
       ctx.beginPath();
       let pen = false;
       for (let i = 0; i <= W; i += 2) {
@@ -480,7 +599,7 @@ function initGraph(side, inst) {
         pen = true;
       }
       ctx.stroke();
-      ctx.fillStyle = c.color; ctx.font = "bold " + (12 * dpr) + "px system-ui";
+      ctx.fillStyle = ccol; ctx.font = "bold " + (12 * dpr) + "px system-ui";
       ctx.fillText("y = " + c.expr, 10 * dpr, (20 + ci * 18) * dpr);
     });
   }
@@ -497,7 +616,7 @@ function initGraph(side, inst) {
     try {
       const fn = compile(expr);
       if (!add) curves = [];
-      curves.push({ expr, fn, color: COLORS[curves.length % COLORS.length] });
+      curves.push({ expr, fn, ci: curves.length });
       draw();
     } catch { toast("Could not understand that function. Try e.g. x^2-3*x+2, sin(x), sqrt(x)", "err", 5000); }
   }
@@ -507,6 +626,14 @@ function initGraph(side, inst) {
   $(".gr-clear", el).addEventListener("click", () => { curves = []; draw(); });
   $(".gr-zi", el).addEventListener("click", () => { view.w = Math.max(1, view.w / 1.4); draw(); });
   $(".gr-zo", el).addEventListener("click", () => { view.w = Math.min(200, view.w * 1.4); draw(); });
+  /* v6 (issue 3): background selector */
+  $(".gr-bg", el).value = grTheme;
+  $(".gr-bg", el).addEventListener("change", (e) => {
+    grTheme = e.target.value;
+    Store.set("graph_bg", grTheme);
+    draw();
+    toast("Graph background: " + e.target.options[e.target.selectedIndex].text);
+  });
 
   /* drag to pan + pinch to zoom — this pane only */
   const touches = new Map();
@@ -678,6 +805,10 @@ function drawComposite() {
     drawPaneInto(ctx, "R", 0, 0, W, H, headH);
   }
 
+  /* v6 (issue 6): when the floating calculator is open, draw it into the
+     broadcast so students see every keystroke of the working. */
+  drawCalcIntoBroadcast(ctx, W, H);
+
   // LIVE watermark + clock
   ctx.fillStyle = "rgba(16,20,43,.78)";
   ctx.fillRect(W - 300, H - 30, 300, 30);
@@ -706,7 +837,18 @@ function drawPaneInto(ctx, side, x, y, w, h, headH) {
   const inst = st.instances[st.app];
   try {
     if (st.app === "board" && inst && inst.wb) {
-      ctx.drawImage(inst.wb.canvas, cx, cy, cw, ch);
+      /* v6 (issue 4): preserve the aspect ratio. Previously the board canvas
+         was STRETCHED to fill the broadcast pane, so the zoom students saw
+         was distorted (different ratio horizontally vs vertically). Now we
+         letterbox-fit it — students see the identical view & zoom ratio. */
+      const bc = inst.wb.canvas;
+      if (bc.width && bc.height) {
+        const s = Math.min(cw / bc.width, ch / bc.height);
+        const dw = bc.width * s, dh = bc.height * s;
+        ctx.fillStyle = "#e9edf5";
+        ctx.fillRect(cx, cy, cw, ch);
+        ctx.drawImage(bc, cx + (cw - dw) / 2, cy + (ch - dh) / 2, dw, dh);
+      }
     } else if (st.app === "pdf" && inst) {
       const c = inst.getCanvas && inst.getCanvas();
       if (c && c.width) {
@@ -741,10 +883,14 @@ function drawPaneInto(ctx, side, x, y, w, h, headH) {
       wrapText(ctx, (inst.getText && inst.getText()) || "", cx + 18, cy + 16, cw - 36, Math.max(20, Math.round(cw / 30)));
     } else if (st.app === "image" && inst && inst.imgEl && inst.imgEl.naturalWidth) {
       const im = inst.imgEl;
-      const s = Math.min(cw / im.naturalWidth, ch / im.naturalHeight);
+      const z = (inst.getZoom && inst.getZoom()) || 1;       /* v6 (issue 4) */
+      const s = Math.min(cw / im.naturalWidth, ch / im.naturalHeight) * z;
       const dw = im.naturalWidth * s, dh = im.naturalHeight * s;
       ctx.fillStyle = "#383d52"; ctx.fillRect(cx, cy, cw, ch);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(cx, cy, cw, ch); ctx.clip();
       ctx.drawImage(im, cx + (cw - dw) / 2, cy + (ch - dh) / 2, dw, dh);
+      ctx.restore();
     } else if (st.app === "graph" || st.app === "toolkit") {       // v4/v5
       const c = inst && inst.getCanvas && inst.getCanvas();
       if (c && c.width) ctx.drawImage(c, cx, cy, cw, ch);
@@ -763,6 +909,37 @@ function drawPaneInto(ctx, side, x, y, w, h, headH) {
     }
   } catch (e) { /* canvas tainting etc — never crash the loop */ }
   ctx.restore();
+}
+
+/* v6 (issue 6): render the calculator state onto the broadcast canvas */
+function drawCalcIntoBroadcast(ctx, W, H) {
+  const box = $("#calcBox");
+  if (!box || box.classList.contains("hide")) return;
+  const cw = Math.round(W * 0.26), chH = Math.round(cw * 0.62);
+  const x = W - cw - 14, y = Math.round(H * 0.08);
+  ctx.save();
+  ctx.fillStyle = "rgba(16,20,43,.92)";
+  ctx.strokeStyle = "#ffb347"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect(x, y, cw, chH, 12); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#ffb347";
+  ctx.font = "bold " + Math.round(cw * 0.055) + "px system-ui";
+  ctx.textBaseline = "middle"; ctx.textAlign = "left";
+  ctx.fillText("🧮 Calculator (" + (typeof calcDeg !== "undefined" && !calcDeg ? "RAD" : "DEG") + ")", x + 12, y + chH * 0.13);
+  /* history tape (last 3) */
+  const hist = $$("#calcHist div").slice(0, 3);
+  ctx.font = Math.round(cw * 0.045) + "px ui-monospace, monospace";
+  ctx.fillStyle = "#9aa3cf";
+  hist.reverse().forEach((d, i) => {
+    ctx.fillText(d.textContent.slice(0, 38), x + 12, y + chH * (0.28 + i * 0.14), cw - 24);
+  });
+  /* current expression big */
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold " + Math.round(cw * 0.085) + "px ui-monospace, monospace";
+  ctx.textAlign = "right";
+  const disp = $("#calcDisplay") ? $("#calcDisplay").value : "0";
+  ctx.fillText(disp.slice(-26), x + cw - 12, y + chH * 0.82, cw - 24);
+  ctx.restore();
+  ctx.textAlign = "left";
 }
 
 function drawPlaceholder(ctx, x, y, w, h, l1, l2, l3) {
@@ -1209,29 +1386,135 @@ function stopCountdown() {
 }
 
 /* ---- local recording (MediaRecorder) ----
-   v4 (issue 8): recording now ALWAYS uses its own private composite-canvas
-   stream + mic. It NEVER calls getDisplayMedia and never touches the screen-
-   capture pipeline, so it cannot conflict with Google Meet / Zoom screen
-   sharing — Meet/Zoom keep sharing the screen, ClassDeck quietly records the
-   workspace in parallel. */
+   v4 (issue 8): private pipeline, never touches screen-capture → no conflict
+   with Meet/Zoom.
+   v6 (issue 5): YOUTUBE-READY BRANDED RECORDING. A dedicated 1280×720
+   recording canvas composes:
+     • the two split panes (the workspace),
+     • a branded header: HMG ACADEMY logo + Subject · Topic · Class,
+     • the teacher camera (bottom-right PiP, when on),
+     • optionally the student camera tiles (toggle in the dialog),
+     • a footer strip with the HMG CONCEPTS channel credit + date.
+   Saved as .webm — upload directly to the HMG CONCEPTS YouTube channel. */
 let recorder = null, recChunks = [], recStream = null;
+let recCanvas = null, recCtx = null, recRaf = null;
+let recMeta = { subject: "", topic: "", klass: "", students: false };
+const recLogo = new Image();
+recLogo.src = "assets/hmg-academy-logo.png";
+
 $("#btnRec").addEventListener("click", () => {
   if (recorder && recorder.state === "recording") { stopRecording(); return; }
+  $("#recSubject").value = Store.get("rec_subject", "");
+  $("#recClass").value = Store.get("rec_class", "");
+  openModal("#mRecSetup");
+});
+$("#recBegin").addEventListener("click", () => {
+  recMeta.subject = $("#recSubject").value.trim() || "Lesson";
+  recMeta.topic = $("#recTopic").value.trim() || "";
+  recMeta.klass = $("#recClass").value.trim() || "";
+  recMeta.students = $("#recStudents").checked;
+  Store.set("rec_subject", recMeta.subject);
+  Store.set("rec_class", recMeta.klass);
+  closeModal("#mRecSetup");
   startRecording();
 });
+
+function drawRecordingFrame() {
+  const ctx = recCtx, W = recCanvas.width, H = recCanvas.height;
+  const headH = Math.round(H * 0.09), footH = Math.round(H * 0.045);
+  /* header: logo + subject/topic/class */
+  ctx.fillStyle = "#10142b";
+  ctx.fillRect(0, 0, W, headH);
+  if (recLogo.complete && recLogo.naturalWidth) {
+    const lh = headH * 0.78, lw = lh * (recLogo.naturalWidth / recLogo.naturalHeight);
+    ctx.drawImage(recLogo, 10, (headH - lh) / 2, lw, lh);
+  }
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold " + Math.round(headH * 0.34) + "px system-ui, sans-serif";
+  ctx.textBaseline = "middle"; ctx.textAlign = "center";
+  const title = recMeta.subject + (recMeta.topic ? " — " + recMeta.topic : "");
+  ctx.fillText(title, W / 2, headH * 0.38, W * 0.55);
+  ctx.fillStyle = "#9aa3cf";
+  ctx.font = Math.round(headH * 0.24) + "px system-ui, sans-serif";
+  ctx.fillText((recMeta.klass ? recMeta.klass + "  ·  " : "") + "HMG ACADEMY CLASS DECK", W / 2, headH * 0.74, W * 0.55);
+  ctx.fillStyle = "#ffb347";
+  ctx.font = "bold " + Math.round(headH * 0.26) + "px system-ui, sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText("HMG ACADEMY", W - 12, headH / 2);
+  ctx.textAlign = "left";
+  /* workspace (the live broadcast canvas) */
+  drawComposite(); // ensure COMP is fresh even if not live
+  ctx.drawImage(COMP.canvas, 0, headH, W, H - headH - footH);
+  /* teacher camera PiP bottom-right */
+  const selfVid = $("#selfVideo");
+  if (camOn && selfVid && selfVid.videoWidth) {
+    const pw = Math.round(W * 0.17), ph = Math.round(pw * 0.75);
+    const px2 = W - pw - 12, py2 = H - footH - ph - 12;
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(px2, py2, pw, ph, 10); ctx.clip();
+    /* mirror like the self-view */
+    ctx.translate(px2 + pw, py2); ctx.scale(-1, 1);
+    ctx.drawImage(selfVid, 0, 0, pw, ph);
+    ctx.restore();
+    ctx.strokeStyle = "#ffb347"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(px2, py2, pw, ph, 10); ctx.stroke();
+  }
+  /* optional student cameras: left edge stack (up to 3 tiles) */
+  if (recMeta.students) {
+    const vids = $$("#camGrid video").filter((v) => v.videoWidth).slice(0, 3);
+    const tw = Math.round(W * 0.13), th2 = Math.round(tw * 0.75);
+    vids.forEach((v, i) => {
+      const px2 = 12, py2 = headH + 12 + i * (th2 + 10);
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(px2, py2, tw, th2, 8); ctx.clip();
+      ctx.drawImage(v, px2, py2, tw, th2);
+      ctx.restore();
+      ctx.strokeStyle = "#4f6ef7"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(px2, py2, tw, th2, 8); ctx.stroke();
+    });
+  }
+  /* footer */
+  ctx.fillStyle = "#10142b"; ctx.fillRect(0, H - footH, W, footH);
+  ctx.fillStyle = "#9aa3cf";
+  ctx.font = Math.round(footH * 0.5) + "px system-ui, sans-serif";
+  ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  ctx.fillText("▶ HMG CONCEPTS on YouTube", 12, H - footH / 2);
+  ctx.textAlign = "right";
+  ctx.fillText(new Date().toLocaleDateString() + "  ·  " + new Date().toLocaleTimeString(), W - 12, H - footH / 2);
+  ctx.textAlign = "left";
+  /* REC dot */
+  ctx.fillStyle = "#ff5d5d";
+  ctx.beginPath(); ctx.arc(W - 24, headH + 18, 7, 0, 7); ctx.fill();
+}
+
+let lastRecFrame = 0;
+function recLoop(ts) {
+  recRaf = requestAnimationFrame(recLoop);
+  if (ts - lastRecFrame < 1000 / COMP.fps) return;
+  lastRecFrame = ts;
+  try { drawRecordingFrame(); } catch {}
+}
+
 async function startRecording() {
-  // private pipeline: composite canvas (independent of broadcast/screen share)
   if (!COMP.raf) { drawComposite(); COMP.raf = requestAnimationFrame(compositeLoop); }
-  recStream = new MediaStream(COMP.canvas.captureStream(COMP.fps).getVideoTracks());
+  /* dedicated branded canvas */
+  recCanvas = document.createElement("canvas");
+  recCanvas.width = 1280; recCanvas.height = 720;
+  recCtx = recCanvas.getContext("2d");
+  drawRecordingFrame();
+  recRaf = requestAnimationFrame(recLoop);
+  recStream = new MediaStream(recCanvas.captureStream(COMP.fps).getVideoTracks());
   await ensureMic(true);
   if (micStream) micStream.getAudioTracks().forEach((t) => recStream.addTrack(t));
   try {
     const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus") ? "video/webm;codecs=vp8,opus" : "video/webm";
-    recorder = new MediaRecorder(recStream, { mimeType: mime, videoBitsPerSecond: 900_000 });
+    recorder = new MediaRecorder(recStream, { mimeType: mime, videoBitsPerSecond: 1_200_000 });
     recChunks = [];
     recorder.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
     recorder.onstop = () => {
-      downloadBlob(new Blob(recChunks, { type: "video/webm" }), "lesson-" + roomCode + "-" + Date.now() + ".webm");
+      const safe = (s) => s.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-");
+      const fname = ["HMG", safe(recMeta.subject || "Lesson"), safe(recMeta.topic || ""), safe(recMeta.klass || ""), new Date().toISOString().slice(0, 10)].filter(Boolean).join("_") + ".webm";
+      downloadBlob(new Blob(recChunks, { type: "video/webm" }), fname);
       recChunks = [];
     };
     recorder.start(2000);
@@ -1242,8 +1525,9 @@ async function startRecording() {
 function stopRecording() {
   try { recorder.stop(); } catch {}
   try { if (recStream) recStream.getVideoTracks().forEach((t) => t.stop()); } catch {}
+  if (recRaf) { cancelAnimationFrame(recRaf); recRaf = null; }   /* v6 */
   $("#btnRec").classList.remove("active");
-  toast("Recording saved to your downloads", "ok");
+  toast("🎬 Branded recording saved — ready for the HMG CONCEPTS YouTube channel", "ok", 5000);
 }
 
 /* v4: teacher self-view — draggable anywhere + tap to cycle size
@@ -1597,13 +1881,14 @@ function parseQuizText(text) {
     if (lines.length < 3) continue;
     const q = lines[0];
     const options = [];
-    let correct = -1;
+    let correct = -1, explanation = "";
     lines.slice(1).forEach((l) => {
-      if (l.startsWith("*")) { correct = options.length; options.push(l.slice(1).trim()); }
+      if (l.startsWith("#")) { explanation = l.slice(1).trim(); }          /* v6: explanation line */
+      else if (l.startsWith("*")) { correct = options.length; options.push(l.slice(1).trim()); }
       else options.push(l);
     });
     if (correct >= 0 && options.length >= 2 && options.length <= 6)
-      questions.push({ q, options, correct });
+      questions.push({ q, options, correct, explanation });
   }
   return questions;
 }
@@ -1637,6 +1922,15 @@ $("#quizEnd").addEventListener("click", () => {
 });
 $("#scoreReset").addEventListener("click", () => {
   if (room) { room.resetScores(); renderLeaderboard(); toast("Scores reset"); }
+});
+/* v6: gradebook export — per-student score CSV for records/parents */
+$("#scoreExport").addEventListener("click", () => {
+  if (!room) { toast("Go live first"); return; }
+  const rows = [["Rank", "Student", "Score", "Room", "Date"]];
+  room.leaderboard().forEach((r, i) => rows.push([i + 1, r.name, r.score, room.code, new Date().toLocaleDateString()]));
+  const csv = rows.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(",")).join("\n");
+  downloadBlob(new Blob([csv], { type: "text/csv" }), "HMG-scores-" + roomCode + "-" + Date.now() + ".csv");
+  toast("📥 Scores exported", "ok");
 });
 
 function renderQuizProgress(p) {
@@ -1684,6 +1978,92 @@ $("#quizBankSel").addEventListener("change", (e) => {
   const banks = Store.get("quizbanks", {});
   const b = banks[e.target.value];
   if (b) { $("#quizTitle").value = e.target.value; $("#quizSecs").value = b.secs; $("#quizText").value = b.text; }
+});
+
+/* ------------------------------------------------------------
+   v6 (issue 7): CSV quiz import
+   Format: Question, A, B, C, D, Correct option, Explanation
+   - header row auto-detected and skipped
+   - quoted fields with commas supported (RFC-4180 style)
+   - correct option accepts A/B/C/D, a-d, or 1-4
+   ------------------------------------------------------------ */
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = "", inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQ = false;
+      } else field += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ",") { row.push(field); field = ""; }
+    else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); field = "";
+      if (row.some((c) => c.trim() !== "")) rows.push(row);
+      row = [];
+    } else field += ch;
+  }
+  row.push(field);
+  if (row.some((c) => c.trim() !== "")) rows.push(row);
+  return rows;
+}
+
+function csvToQuestions(text) {
+  const rows = parseCSV(text);
+  const out = [], errors = [];
+  rows.forEach((r, idx) => {
+    if (r.length < 6) { if (r.length > 1) errors.push("Row " + (idx + 1) + ": needs at least 6 columns"); return; }
+    const [q, a, b, c, d, corr] = r.map((s) => String(s).trim());
+    const expl = (r[6] || "").trim();
+    /* skip header row */
+    if (idx === 0 && /^question/i.test(q) && /^a$/i.test(a)) return;
+    if (!q) { errors.push("Row " + (idx + 1) + ": empty question"); return; }
+    const options = [a, b, c, d].filter((o) => o !== "");
+    if (options.length < 2) { errors.push("Row " + (idx + 1) + ": needs at least options A and B"); return; }
+    let ci = -1;
+    const cu = corr.toUpperCase();
+    if (["A", "B", "C", "D"].includes(cu)) ci = cu.charCodeAt(0) - 65;
+    else if (["1", "2", "3", "4"].includes(cu)) ci = Number(cu) - 1;
+    if (ci < 0 || ci >= options.length) { errors.push("Row " + (idx + 1) + ": correct option '" + corr + "' invalid"); return; }
+    out.push({ q, options, correct: ci, explanation: expl });
+  });
+  return { questions: out, errors };
+}
+
+$("#quizCsvBtn").addEventListener("click", () => $("#quizCsvFile").click());
+$("#quizCsvFile").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  e.target.value = "";
+  try {
+    const { questions, errors } = csvToQuestions(await f.text());
+    if (!questions.length) {
+      $("#quizCsvStatus").textContent = "❌ No valid questions found. " + (errors[0] || "");
+      return;
+    }
+    /* convert into the editable text format so the teacher can still review/edit */
+    $("#quizText").value = questions.map((qq) =>
+      qq.q + "\n" + qq.options.map((o, i) => (i === qq.correct ? "*" : "") + o).join("\n") +
+      (qq.explanation ? "\n# " + qq.explanation : "")
+    ).join("\n\n");
+    if (!$("#quizTitle").value) $("#quizTitle").value = f.name.replace(/\.csv$/i, "");
+    $("#quizCsvStatus").textContent = "✅ Loaded " + questions.length + " question(s) from " + f.name +
+      (errors.length ? " — " + errors.length + " row(s) skipped" : "") + ". Review above, then Start quiz.";
+    toast("📤 CSV loaded: " + questions.length + " questions", "ok");
+  } catch (err) {
+    $("#quizCsvStatus").textContent = "❌ Could not read the file: " + err.message;
+  }
+});
+$("#quizCsvTemplate").addEventListener("click", () => {
+  const sample =
+'Question,A,B,C,D,Correct option,Explanation/working\n' +
+'"What is 54 ÷ 6?",9,8,7,6,A,"54 ÷ 6 = 9 because 6 × 9 = 54"\n' +
+'"Solve x + 2 = 5",2,3,4,5,B,"Subtract 2 from both sides: x = 5 − 2 = 3"\n' +
+'"Which is a prime number?",4,6,7,9,C,"7 has exactly two factors: 1 and 7"\n';
+  downloadBlob(new Blob([sample], { type: "text/csv" }), "HMG-quiz-template.csv");
 });
 
 /* hook quiz events into the room event stream */
@@ -2029,3 +2409,14 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "PageDown" && board) { board.wb.gotoPage(board.wb.pageIndex + 1); }
   if (e.key === "PageUp" && board) { board.wb.gotoPage(board.wb.pageIndex - 1); }
 });
+
+/* ------------------------------------------------------------
+   v6 (issue 8): teacher licensing gate (SaaS)
+   Students (join.html) are never gated. The Teacher Studio
+   checks: valid license → OK ; else 14-day trial → OK ;
+   else locked until a key is activated. Keys are generated
+   on admin.html by HMG ACADEMY after payment.
+   ------------------------------------------------------------ */
+if (typeof requireTeacherAccess === "function") {
+  requireTeacherAccess();
+}

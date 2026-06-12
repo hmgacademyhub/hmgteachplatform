@@ -185,7 +185,8 @@ class TeacherRoom {
           q.scores.set(conn.peer, (q.scores.get(conn.peer) || 0) + pts);
         }
         q.tally[qi][Number(d.answer)] = (q.tally[qi][Number(d.answer)] || 0) + 1;
-        conn.send({ t: "quizFeedback", correct, correctIndex: q.def.questions[qi].correct });
+        conn.send({ t: "quizFeedback", correct, correctIndex: q.def.questions[qi].correct,
+                    explanation: q.def.questions[qi].explanation || "" });   /* v6 */
         this.onEvent("quiz-progress", this.quizProgress());
         break;
       }
