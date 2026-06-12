@@ -588,6 +588,18 @@ function initWeb(side, inst) {
 
   $(".web-fontup", el).addEventListener("click", () => reader && reader.setFontScale(reader.fontScale * 1.15));
   $(".web-fontdn", el).addEventListener("click", () => reader && reader.setFontScale(reader.fontScale / 1.15));
+  /* v7: reading themes */
+  const themeSel = $(".web-theme", el);
+  themeSel.value = Store.get("reader_theme", "light");
+  themeSel.addEventListener("change", (e) => reader && reader.setTheme(e.target.value));
+  /* v7: curated education library dropdown */
+  $(".web-linklib", el).addEventListener("change", (e) => {
+    const u = e.target.value;
+    if (!u) return;
+    nav(u);
+    _navHook(u);
+    e.target.selectedIndex = 0;
+  });
 
   /* optional TRUE live capture — desktops only */
   $(".web-livecast", el).addEventListener("click", async (e) => {
@@ -952,10 +964,20 @@ function setQuality(qstr) {
 setQuality(Store.get("quality", "1280x720x8"));
 
 let lastComposite = 0;
+let _hbCounter = 0;
 function compositeLoop(ts) {
   COMP.raf = requestAnimationFrame(compositeLoop);
   if (ts - lastComposite < 1000 / COMP.fps) return;
   lastComposite = ts;
+  /* v7 security: re-verify auth every ~5 s of streaming. If the gate was
+     bypassed (overlay deleted / flag flipped), the class ends itself. */
+  if (++_hbCounter % (COMP.fps * 5) === 0 && room &&
+      typeof authHeartbeat === "function" && !authHeartbeat()) {
+    try { room.end(); } catch {}
+    cancelAnimationFrame(COMP.raf); COMP.raf = null;
+    if (typeof requireTeacherAccess === "function") requireTeacherAccess();
+    return;
+  }
   drawComposite();
 }
 
@@ -1618,15 +1640,49 @@ function stopCountdown() {
    Saved as .webm — upload directly to the HMG CONCEPTS YouTube channel. */
 let recorder = null, recChunks = [], recStream = null;
 let recCanvas = null, recCtx = null, recRaf = null;
-let recMeta = { subject: "", topic: "", klass: "", students: false };
-const recLogo = new Image();
-recLogo.src = "assets/hmg-academy-logo.png";
+let recMeta = { subject: "", topic: "", klass: "", students: false, brand: "", footer: "" };
+/* v7 (issue 4): each teacher records under THEIR OWN brand.
+   Logo: teacher-uploaded (stored on device) → else their academy initial badge.
+   Brand/footer text: from the recording dialog (remembered). */
+let recLogo = new Image();
+function loadRecLogo() {
+  const data = Store.get("rec_logo", null);
+  recLogo = new Image();
+  if (data) recLogo.src = data;
+}
+loadRecLogo();
 
 $("#btnRec").addEventListener("click", () => {
   if (recorder && recorder.state === "recording") { stopRecording(); return; }
   $("#recSubject").value = Store.get("rec_subject", "");
   $("#recClass").value = Store.get("rec_class", "");
+  /* v7: prefill the teacher's own brand (defaults to their account/brand name) */
+  $("#recBrand").value = Store.get("rec_brand", "") || Store.get("brand", "") || "";
+  $("#recFooter").value = Store.get("rec_footer", "");
+  $("#recLogoStatus").textContent = Store.get("rec_logo", null) ? "✓ custom logo saved" : "";
   openModal("#mRecSetup");
+});
+$("#recLogoBtn").addEventListener("click", () => $("#recLogoFile").click());
+$("#recLogoFile").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  e.target.value = "";
+  /* downscale to keep localStorage light */
+  const img = await new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = fr.result; };
+    fr.onerror = rej; fr.readAsDataURL(f);
+  });
+  const c = document.createElement("canvas");
+  const k = Math.min(1, 360 / Math.max(img.naturalWidth, img.naturalHeight));
+  c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  try {
+    Store.set("rec_logo", c.toDataURL("image/png"));
+    loadRecLogo();
+    $("#recLogoStatus").textContent = "✓ custom logo saved";
+    toast("🖼 Your logo will appear on recordings", "ok");
+  } catch { toast("Logo too large to store — choose a smaller image.", "err"); }
 });
 $("#recBegin").addEventListener("click", () => {
   if (typeof authEnforce === "function" && !authEnforce()) { closeModal("#mRecSetup"); return; }
@@ -1634,8 +1690,12 @@ $("#recBegin").addEventListener("click", () => {
   recMeta.topic = $("#recTopic").value.trim() || "";
   recMeta.klass = $("#recClass").value.trim() || "";
   recMeta.students = $("#recStudents").checked;
+  recMeta.brand = $("#recBrand").value.trim() || "My Classroom";
+  recMeta.footer = $("#recFooter").value.trim() || "";
   Store.set("rec_subject", recMeta.subject);
   Store.set("rec_class", recMeta.klass);
+  Store.set("rec_brand", recMeta.brand);
+  Store.set("rec_footer", recMeta.footer);
   closeModal("#mRecSetup");
   startRecording();
 });
@@ -1646,22 +1706,31 @@ function drawRecordingFrame() {
   /* header: logo + subject/topic/class */
   ctx.fillStyle = "#10142b";
   ctx.fillRect(0, 0, W, headH);
+  /* v7: the TEACHER'S brand — their logo, or a coloured initial badge */
   if (recLogo.complete && recLogo.naturalWidth) {
-    const lh = headH * 0.78, lw = lh * (recLogo.naturalWidth / recLogo.naturalHeight);
+    const lh = headH * 0.78, lw = Math.min(lh * (recLogo.naturalWidth / recLogo.naturalHeight), W * 0.22);
     ctx.drawImage(recLogo, 10, (headH - lh) / 2, lw, lh);
+  } else {
+    const bs = headH * 0.7;
+    ctx.fillStyle = "#4f6ef7";
+    ctx.beginPath(); ctx.roundRect(10, (headH - bs) / 2, bs, bs, bs * 0.22); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold " + Math.round(bs * 0.62) + "px system-ui, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText((recMeta.brand || "C").charAt(0).toUpperCase(), 10 + bs / 2, headH / 2 + bs * 0.03);
   }
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold " + Math.round(headH * 0.34) + "px system-ui, sans-serif";
   ctx.textBaseline = "middle"; ctx.textAlign = "center";
   const title = recMeta.subject + (recMeta.topic ? " — " + recMeta.topic : "");
-  ctx.fillText(title, W / 2, headH * 0.38, W * 0.55);
+  ctx.fillText(title, W / 2, headH * 0.38, W * 0.5);
   ctx.fillStyle = "#9aa3cf";
   ctx.font = Math.round(headH * 0.24) + "px system-ui, sans-serif";
-  ctx.fillText((recMeta.klass ? recMeta.klass + "  ·  " : "") + "HMG ACADEMY CLASS DECK", W / 2, headH * 0.74, W * 0.55);
+  ctx.fillText((recMeta.klass ? recMeta.klass + "  ·  " : "") + recMeta.brand, W / 2, headH * 0.74, W * 0.5);
   ctx.fillStyle = "#ffb347";
   ctx.font = "bold " + Math.round(headH * 0.26) + "px system-ui, sans-serif";
   ctx.textAlign = "right";
-  ctx.fillText("HMG ACADEMY", W - 12, headH / 2);
+  ctx.fillText(recMeta.brand, W - 12, headH / 2, W * 0.26);
   ctx.textAlign = "left";
   /* workspace (the live broadcast canvas) */
   drawComposite(); // ensure COMP is fresh even if not live
@@ -1699,7 +1768,7 @@ function drawRecordingFrame() {
   ctx.fillStyle = "#9aa3cf";
   ctx.font = Math.round(footH * 0.5) + "px system-ui, sans-serif";
   ctx.textAlign = "left"; ctx.textBaseline = "middle";
-  ctx.fillText("▶ HMG CONCEPTS on YouTube", 12, H - footH / 2);
+  ctx.fillText(recMeta.footer || ("Recorded with HMG ACADEMY CLASS DECK"), 12, H - footH / 2, W * 0.6);
   ctx.textAlign = "right";
   ctx.fillText(new Date().toLocaleDateString() + "  ·  " + new Date().toLocaleTimeString(), W - 12, H - footH / 2);
   ctx.textAlign = "left";
@@ -1734,7 +1803,7 @@ async function startRecording() {
     recorder.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
     recorder.onstop = () => {
       const safe = (s) => s.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-");
-      const fname = ["HMG", safe(recMeta.subject || "Lesson"), safe(recMeta.topic || ""), safe(recMeta.klass || ""), new Date().toISOString().slice(0, 10)].filter(Boolean).join("_") + ".webm";
+      const fname = [safe(recMeta.brand || "Lesson"), safe(recMeta.subject || ""), safe(recMeta.topic || ""), safe(recMeta.klass || ""), new Date().toISOString().slice(0, 10)].filter(Boolean).join("_") + ".webm";
       downloadBlob(new Blob(recChunks, { type: "video/webm" }), fname);
       recChunks = [];
     };
@@ -1748,7 +1817,7 @@ function stopRecording() {
   try { if (recStream) recStream.getVideoTracks().forEach((t) => t.stop()); } catch {}
   if (recRaf) { cancelAnimationFrame(recRaf); recRaf = null; }   /* v6 */
   $("#btnRec").classList.remove("active");
-  toast("🎬 Branded recording saved — ready for the HMG CONCEPTS YouTube channel", "ok", 5000);
+  toast("🎬 Recording saved with YOUR brand — ready for your channel", "ok", 5000);
 }
 
 /* v4: teacher self-view — draggable anywhere + tap to cycle size

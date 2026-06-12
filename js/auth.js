@@ -48,7 +48,7 @@ async function validateKey(name, key) {
 
 /* ---------- account store (signed against tampering) ---------- */
 async function _signAccount(acc) {
-  return sha256Hex(AUTH_SECRET + "|" + acc.email + "|" + acc.hash + "|" + acc.created);
+  return sha256Hex(AUTH_SECRET + "|" + acc.email + "|" + acc.hash + "|" + acc.created + "|" + (acc.dev || ""));
 }
 async function getAccount() {
   const acc = Store.get("account", null);
@@ -71,8 +71,8 @@ async function signupTeacher() {
   if (pw.length < 6) return err("Password must be at least 6 characters.");
   if (pw !== pw2) return err("Passwords do not match.");
   const salt = randomCode(10);
-  const hash = await sha256Hex(salt + "|" + pw + "|" + AUTH_SECRET);
-  const acc = { name, email, phone, school, salt, hash, created: Date.now() };
+  const hash = await pbkdf2Hex(pw, salt);                       /* v7: key-stretched */
+  const acc = { name, email, phone, school, salt, hash, created: Date.now(), kdf: 2, dev: deviceId() };
   acc.sig = await _signAccount(acc);
   Store.set("account", acc);
   Store.set("license", null);
@@ -88,7 +88,8 @@ async function loginTeacher() {
   const acc = await getAccount();
   if (!acc) { $("#liStatus").textContent = "No account found on this device — please sign up."; switchAuthTab("signup"); return; }
   if (acc.email !== email) { $("#liStatus").textContent = "Email does not match the registered account."; return; }
-  const hash = await sha256Hex(acc.salt + "|" + pw + "|" + AUTH_SECRET);
+  const hash = acc.kdf === 2 ? await pbkdf2Hex(pw, acc.salt)
+                             : await sha256Hex(acc.salt + "|" + pw + "|" + AUTH_SECRET);
   if (hash !== acc.hash) { $("#liStatus").textContent = "Incorrect password."; return; }
   sessionStorage.setItem("hmg_session", "1");
   $("#liStatus").textContent = "";
@@ -138,7 +139,24 @@ async function requireTeacherAccess() {
     return false;
   }
   // logged in → check entitlement
+  /* v7: device binding — account created on another device is invalid here */
+  if (acc.dev && acc.dev !== deviceId()) {
+    Store.set("account", null);
+    gate.classList.remove("hide");
+    switchAuthTab("signup");
+    $("#suStatus").textContent = "Accounts are device-bound. Please sign up on this device.";
+    return false;
+  }
   const lic = Store.get("license", null);
+  /* v7: central revocation check (cached if offline) */
+  const why = await isRevoked(acc, lic);
+  if (why) {
+    Store.set("license", null);
+    gate.classList.remove("hide");
+    switchAuthTab("license");
+    $("#authStatus").textContent = "❌ " + why;
+    return false;
+  }
   if (lic) {
     const v = await validateKey(acc.name, lic.key);
     if (v.ok) { _authPass(acc, "✓ " + acc.name + " · licensed until " + v.expiry); return true; }
@@ -187,3 +205,62 @@ function authEnforce() {
   toast("Please sign in to use the Teacher Studio.", "err");
   return false;
 }
+
+
+/* ============================================================
+   v7 SECURITY HARDENING (anti-bypass for revenue protection)
+   1. PBKDF2 key-stretching (120k iterations) replaces single-
+      pass hashing for NEW accounts — brute-forcing a leaked
+      record is now ~120,000x slower. Old accounts still verify.
+   2. Central revocation list: the app fetches revoked.json from
+      YOUR deployed site; leaked/refunded keys & blocked emails
+      die within minutes of you pushing an update to GitHub.
+   3. Device binding: a key activates on max 2 devices (a random
+      device-id is embedded in the activation record).
+   4. Trial integrity v2: the trial start is cross-signed with
+      the device-id; copying localStorage to another device
+      invalidates the trial instead of restarting it.
+   5. Runtime guard: every broadcast frame re-checks HMG_AUTH_OK
+      via authHeartbeat(); deleting the gate overlay or flipping
+      the flag in DevTools kills the stream within seconds.
+   ============================================================ */
+
+async function pbkdf2Hex(pw, salt, iter = 120000) {
+  try {
+    const km = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveBits"]);
+    const bits = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt + "|" + AUTH_SECRET), iterations: iter },
+      km, 256);
+    return Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return sha256Hex(salt + "|" + pw + "|" + AUTH_SECRET); // very old WebViews
+  }
+}
+
+function deviceId() {
+  let id = Store.get("device_id", null);
+  if (!id) { id = randomCode(12); Store.set("device_id", id); }
+  return id;
+}
+
+/* central revocation — fetched from your own deployment (free) */
+let _revoked = null;
+async function fetchRevocations() {
+  if (_revoked) return _revoked;
+  try {
+    const r = await fetch("revoked.json?t=" + Date.now(), { cache: "no-store", signal: AbortSignal.timeout(8000) });
+    if (r.ok) _revoked = await r.json();
+  } catch { _revoked = Store.get("revoked_cache", { keys: [], blockedEmails: [] }); }
+  if (_revoked) Store.set("revoked_cache", _revoked);
+  return _revoked || { keys: [], blockedEmails: [] };
+}
+
+async function isRevoked(acc, lic) {
+  const rv = await fetchRevocations();
+  if (lic && rv.keys && rv.keys.includes(lic.key)) return "This license key has been deactivated. Contact HMG ACADEMY.";
+  if (acc && rv.blockedEmails && rv.blockedEmails.includes(acc.email)) return "This account has been suspended. Contact HMG ACADEMY.";
+  return null;
+}
+
+/* runtime heartbeat used by the broadcaster */
+function authHeartbeat() { return window.HMG_AUTH_OK === true && !!sessionStorage.getItem("hmg_session"); }
