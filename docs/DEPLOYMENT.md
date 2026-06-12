@@ -212,7 +212,7 @@ If anything fails on step 3–5, check: HTTPS URL? Camera/mic permissions
 2. Deploy as usual. Bookmark `https://YOUR-SITE/admin.html` privately —
    it is unlisted (robots-noindex) and useless without your secret phrase.
 3. Revenue flow:
-   - Teacher gets a 14-day free trial automatically (no signup friction).
+   - Teacher gets a 3-day free trial automatically (no signup friction).
    - To continue, they pay your fee via Paystack/Flutterwave payment link,
      bank transfer or POS (put the details on hmgacademy.pages.dev).
    - On admin.html: type your secret + their full name + expiry month →
