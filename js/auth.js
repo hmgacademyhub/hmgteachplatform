@@ -20,7 +20,7 @@
    ============================================================ */
 "use strict";
 
-const AUTH_SECRET = "CHANGE-ME-HMG-2026";   /* ← set your own private phrase */
+const AUTH_SECRET = "HelpbyGod";   /* ← set your own private phrase */
 const TRIAL_DAYS = 14;
 const HMG_PAY_INFO =
   "To get your HMG ACCESS KEY:\n" +
