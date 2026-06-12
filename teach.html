@@ -57,11 +57,8 @@
   <!-- floating handle to exit focus mode -->
   <button id="focusHandle" class="focus-handle hide" title="Show toolbar">☰</button>
 
-  <!-- v6: license badge -->
-  <span id="authBadge" class="badge hide" style="position:fixed;bottom:8px;left:8px;z-index:400;font-size:10.5px"></span>
-
-  <!-- v6: lock screen when trial expired & no license -->
-  <div id="authGate" class="hide" style="position:fixed;inset:0;z-index:880;background:rgba(7,10,25,.92);backdrop-filter:blur(4px)"></div>
+  <!-- v6: account badge (tap = logout) -->
+  <span id="authBadge" class="badge hide" style="position:fixed;bottom:8px;left:8px;z-index:400;font-size:10.5px;cursor:pointer"></span>
 
   <!-- ============ SPLIT WORKSPACE ============ -->
   <div class="workspace" id="workspace">
@@ -77,6 +74,8 @@
         <span class="tab" data-app="graph">📈 Graph</span>
         <span class="tab" data-app="video">🎬 Video</span>
         <span class="tab" data-app="toolkit">🧰 Toolkit</span>
+        <span class="tab" data-app="flash">🃏 Cards</span>
+        <span class="tab" data-app="stopwatch">⏱ Timer</span>
       </div>
       <div class="pane-body" id="bodyL"></div>
     </div>
@@ -94,6 +93,8 @@
         <span class="tab" data-app="graph">📈 Graph</span>
         <span class="tab" data-app="video">🎬 Video</span>
         <span class="tab" data-app="toolkit">🧰 Toolkit</span>
+        <span class="tab" data-app="flash">🃏 Cards</span>
+        <span class="tab" data-app="stopwatch">⏱ Timer</span>
       </div>
       <div class="pane-body" id="bodyR"></div>
     </div>
@@ -197,6 +198,7 @@
       <input type="text" class="input web-url" placeholder="Type a URL, e.g. en.wikipedia.org" />
       <button class="btn small primary web-go">Go</button>
       <button class="btn small web-pop" title="Open in a real browser tab">↗</button>
+      <button class="btn small ok web-cast" title="Cast this browser to your students (switches the broadcast to live screen capture)">📡 Cast</button>
     </div>
     <div class="quick-links">
       <button class="btn small ghost web-quick" data-u="https://en.wikipedia.org">Wikipedia</button>
@@ -206,7 +208,7 @@
       <button class="btn small ghost web-quick" data-u="https://archive.org">Archive.org</button>
     </div>
     <iframe class="web-frame" id="webFrame" style="flex:1;border:none;background:#fff" referrerpolicy="no-referrer"></iframe>
-    <div class="web-note">⚠ Some sites (Google, YouTube watch pages…) block embedding. If a page stays blank, use ↗ to open it in a browser tab, or use a site from the quick links. The embedded browser is <b>not</b> visible in the composite broadcast — students see a placeholder unless you use “Share screen” mode.</div>
+    <div class="web-note">💡 Tap <b>📡 Cast</b> so students see this browser LIVE. Some sites (Google, YouTube watch pages…) refuse to embed — use ↗ or the quick links.</div>
   </section>
 </template>
 
@@ -290,7 +292,7 @@
           <option value="score">🏅 Team scoreboard</option>
           <option value="letters">🅰 Letter formation</option>
         </optgroup>
-        <optgroup label="Library (93 reference cards)">
+        <optgroup label="Library (161 reference cards)">
           <option value="cards">📇 Reference library — Maths · Science · English · Social · ICT</option>
         </optgroup>
       </select>
@@ -360,7 +362,7 @@
       <!-- cards bar -->
       <span class="tk-cardbar hide" style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
         <select class="input tk-cardcat" style="width:auto;padding:5px"></select>
-        <input class="input tk-cardq" placeholder="Search 93 cards…" style="flex:1;min-width:70px;padding:5px" />
+        <input class="input tk-cardq" placeholder="Search 160+ cards…" style="flex:1;min-width:70px;padding:5px" />
         <button class="btn small tk-cardprev">‹</button><button class="btn small tk-cardnext">›</button>
       </span>
       <span class="tk-convbar hide" style="display:flex;gap:5px;align-items:center;flex:1;min-width:0">
@@ -379,6 +381,44 @@
       <span style="font-size:11.5px;color:var(--text-dim)">Interactive — tap items. Students see everything live.</span>
     </div>
     <div class="tk-stage" style="flex:1;position:relative;background:#fff"></div>
+  </section>
+</template>
+
+<template id="tpl-flash">
+  <section class="app-flash active">
+    <div class="pdf-bar">
+      <button class="btn small fc-edit">✏ Edit cards</button>
+      <button class="btn small fc-prev">‹</button>
+      <span class="fc-pos" style="font-size:13px">1 / 1</span>
+      <button class="btn small fc-next">›</button>
+      <button class="btn small fc-shuffle">🔀</button>
+      <span style="font-size:11.5px;color:var(--text-dim)">Tap the card to flip — great for definitions, vocabulary &amp; formulas</span>
+    </div>
+    <div class="fc-stage" style="flex:1;position:relative;background:#f6f8ff;display:flex;align-items:center;justify-content:center;cursor:pointer">
+      <div class="fc-card" style="width:min(82%,760px);min-height:55%;background:#fff;border:2px solid #1e2a78;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;padding:30px;text-align:center">
+        <span class="fc-text" style="font-size:clamp(18px,3.4vw,34px);color:#1e2a78;font-weight:700;line-height:1.4">Tap ✏ Edit cards to add your flashcards</span>
+      </div>
+    </div>
+    <textarea class="fc-editor input hide" rows="6" style="margin:8px;font-size:13px" placeholder="One card per line:  front | back&#10;Photosynthesis | Process by which green plants make food using sunlight&#10;2 x 9 | 18"></textarea>
+  </section>
+</template>
+
+<template id="tpl-stopwatch">
+  <section class="app-stopwatch active">
+    <div class="pdf-bar">
+      <select class="input sw-mode" style="width:auto;padding:5px"><option value="stopwatch">⏱ Stopwatch</option><option value="countdown">⏳ Countdown</option></select>
+      <span class="sw-cdbar hide" style="display:flex;gap:4px;align-items:center">
+        <input class="input sw-mins" type="number" value="5" min="0" style="width:64px;padding:5px" /><span style="font-size:12px">min</span>
+        <input class="input sw-secs" type="number" value="0" min="0" max="59" style="width:64px;padding:5px" /><span style="font-size:12px">sec</span>
+      </span>
+      <button class="btn small primary sw-start">▶ Start</button>
+      <button class="btn small sw-lap">🏁 Lap</button>
+      <button class="btn small sw-reset">↺ Reset</button>
+    </div>
+    <div class="sw-stage" style="flex:1;background:#10142b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+      <div class="sw-display" style="font-size:clamp(48px,11vw,130px);font-weight:800;color:#fff;font-variant-numeric:tabular-nums">00:00.0</div>
+      <div class="sw-laps" style="color:#9aa3cf;font-size:14px;max-height:24%;overflow:auto;text-align:center"></div>
+    </div>
   </section>
 </template>
 
@@ -624,28 +664,53 @@ Not sure</textarea>
   </div>
 </div>
 
-<!-- v6: teacher license / activation -->
-<div class="modal-back" id="mAuth">
-  <div class="modal">
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
-      <img src="assets/hmg-academy-logo.png" alt="" style="height:44px;border-radius:8px" />
-      <h3 style="margin:0">Teacher license</h3>
+<!-- v6: full-screen teacher auth gate (signup / login / license) -->
+<div id="authGate" class="auth-gate hide">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <img src="assets/hmg-academy-logo.png" alt="HMG ACADEMY" />
+      <div>
+        <b>HMG ACADEMY CLASS DECK</b>
+        <span>Teacher Studio — sign in to start teaching</span>
+      </div>
     </div>
-    <p style="color:var(--text-dim);font-size:13.5px;line-height:1.6">
-      <b>Students always join free.</b> Teachers get a <b>14-day free trial</b>, then a small
-      license fee keeps HMG ACADEMY CLASS DECK running and supports new features.
-      Pay via the details on <a href="https://hmgacademy.pages.dev" target="_blank" rel="noopener" style="color:var(--brand)">hmgacademy.pages.dev</a>
-      (Paystack/Flutterwave/bank transfer) and receive your personal HMG ACCESS KEY on WhatsApp.
-    </p>
-    <label style="margin-top:8px">Your registered full name</label>
-    <input class="input" id="authName" placeholder="e.g. Mrs Funke Ojo" />
-    <label style="margin-top:8px">HMG ACCESS KEY</label>
-    <input class="input" id="authKey" placeholder="HMG-202612-XXXXXXXXXX" style="text-transform:uppercase" />
-    <p id="authStatus" style="font-size:13px;color:var(--danger);margin-top:6px"></p>
-    <div class="row" style="margin-top:8px">
-      <button class="btn primary" onclick="activateLicense()">Activate</button>
-      <button class="btn" onclick="closeModal('#mAuth')">Later</button>
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="signup" onclick="switchAuthTab('signup')">Create account</button>
+      <button class="auth-tab" data-tab="login" onclick="switchAuthTab('login')">Log in</button>
+      <button class="auth-tab" data-tab="license" onclick="switchAuthTab('license')">Activate key</button>
     </div>
+
+    <div class="auth-pane" data-tab="signup">
+      <p class="auth-note">Free for <b>3 days</b> — no card needed. Students always join free.</p>
+      <input class="input" id="suName" placeholder="Full name (e.g. Mrs Funke Ojo)" autocomplete="name" />
+      <input class="input" id="suEmail" type="email" placeholder="Email address" autocomplete="email" />
+      <input class="input" id="suPhone" type="tel" placeholder="WhatsApp / phone number" autocomplete="tel" />
+      <input class="input" id="suSchool" placeholder="School / organisation (optional)" />
+      <input class="input" id="suPw" type="password" placeholder="Password (min 6 characters)" autocomplete="new-password" />
+      <input class="input" id="suPw2" type="password" placeholder="Confirm password" autocomplete="new-password" />
+      <p class="auth-err" id="suStatus"></p>
+      <button class="btn primary auth-cta" onclick="signupTeacher()">Start my free trial ➜</button>
+    </div>
+
+    <div class="auth-pane hide" data-tab="login">
+      <p class="auth-note">Welcome back! Log in to continue.</p>
+      <input class="input" id="liEmail" type="email" placeholder="Email address" autocomplete="email" />
+      <input class="input" id="liPw" type="password" placeholder="Password" autocomplete="current-password" />
+      <p class="auth-err" id="liStatus"></p>
+      <button class="btn primary auth-cta" onclick="loginTeacher()">Log in ➜</button>
+    </div>
+
+    <div class="auth-pane hide" data-tab="license">
+      <p class="auth-note">Get your <b>HMG ACCESS KEY</b> from
+        <a href="https://hmgacademy.pages.dev" target="_blank" rel="noopener">hmgacademy.pages.dev</a> —
+        pay the small license fee and receive the key on WhatsApp within minutes.</p>
+      <input class="input" id="authKey" placeholder="HMG-202612-XXXXXXXXXX" style="text-transform:uppercase" />
+      <p class="auth-err" id="authStatus"></p>
+      <button class="btn primary auth-cta" onclick="activateLicense()">Activate ➜</button>
+      <button class="btn ghost auth-cta hide" id="authSkip" onclick="authSkip()">Continue trial for now</button>
+    </div>
+
+    <p class="auth-foot">Built by HMG ACADEMY · Lagos, Nigeria — your data stays on your device.</p>
   </div>
 </div>
 
@@ -706,6 +771,7 @@ Not sure</textarea>
 <script src="js/whiteboard.js"></script>
 <script src="js/toolkit.js"></script>
 <script src="js/toolkit-data.js"></script>
+<script src="js/toolkit-data2.js"></script>
 <script src="js/toolkit-ext.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/rtc.js"></script>

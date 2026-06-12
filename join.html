@@ -21,7 +21,8 @@
     <p class="sub" style="background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:8px;font-size:12px">
       ℹ The teacher must be <b>LIVE</b> (▶ Go Live pressed on their side) before you can join.
       If it says "class not found", wait for your teacher to start, then tap Join again.</p>
-    <div>
+    <span id="roomChip" class="badge hide" style="align-self:center;font-size:13px;padding:6px 14px;background:var(--bg-3);color:var(--accent);font-weight:700"></span>
+    <div id="roomFieldWrap">
       <label style="font-size:13px;color:var(--text-dim)">Room code</label>
       <input class="input" id="inRoom" placeholder="e.g. K7M2QX" autocapitalize="characters" maxlength="10" style="text-transform:uppercase;letter-spacing:2px;font-weight:700" />
     </div>
