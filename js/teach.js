@@ -540,19 +540,59 @@ function initWeb(side, inst) {
   $(".web-pop", el).addEventListener("click", () => { if (urlIn.value) window.open(/^https?:/i.test(urlIn.value) ? urlIn.value : "https://" + urlIn.value, "_blank"); });
   $$(".web-quick", el).forEach((b) => b.addEventListener("click", () => nav(b.dataset.u)));
 
-  /* ----- v6 (issue 3): 📡 CAST — students see the browser live -----
-     Browsers forbid reading iframe pixels into a canvas, so the composite
-     can never contain the web pane. The fix: one tap on 📡 Cast switches
-     the stage to a LIVE TAB/SCREEN CAPTURE (getDisplayMedia) — students
-     then see the real browser (scrolling, videos, everything) in the same
-     stream. Tap again (or stop the share) to return to composite mode. */
-  $(".web-cast", el).addEventListener("click", async (e) => {
+  /* ----- v6.2 (issue 3): 📡 CAST that works on EVERY device -----
+     Android Chrome/Edge have NO getDisplayMedia, so live tab capture is
+     impossible on tablets/phones. Reader Cast solves it universally:
+     the page content (headings, text, lists, images) is fetched through
+     free reader/CORS proxies and rendered onto a canvas — and canvases
+     ARE broadcastable. Students see the page in the live stream and it
+     scrolls exactly as the teacher scrolls. On desktops that DO support
+     getDisplayMedia, a separate 🎥 Live button offers true tab capture. */
+  const readerHost = $(".web-reader", el);
+  let reader = null, castOn = false;
+  inst.getReaderCanvas = () => (castOn && reader ? reader.canvas : null);
+
+  function enterReader(url) {
+    if (!reader) reader = new ReaderView(readerHost);
+    castOn = true;
+    frame.classList.add("hide");
+    readerHost.classList.remove("hide");
+    $(".web-readerbar", el).classList.remove("hide");
+    $(".web-cast", el).classList.add("active");
+    /* show 🎥 Live only where the API actually exists (desktops) */
+    if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)
+      $(".web-livecast", el).classList.remove("hide");
+    reader.load(url);
+    toast("📡 Reader Cast ON — students see this page in the broadcast. Drag to scroll.", "ok", 6000);
+  }
+  function exitReader() {
+    castOn = false;
+    readerHost.classList.add("hide");
+    $(".web-readerbar", el).classList.add("hide");
+    frame.classList.remove("hide");
+    $(".web-cast", el).classList.remove("active");
+    toast("Reader Cast off — back to normal browsing.");
+  }
+
+  $(".web-cast", el).addEventListener("click", () => {
+    if (castOn) { exitReader(); return; }
+    const u = urlIn.value.trim() || frame.src;
+    if (!u || u === "about:blank") { toast("Enter a URL first, then tap Cast.", "err"); return; }
+    enterReader(u);
+  });
+  /* navigating while casting reloads the reader */
+  const _navHook = (u) => { if (castOn && reader) reader.load(u); };
+  $(".web-go", el).addEventListener("click", () => _navHook(urlIn.value.trim()));
+  urlIn.addEventListener("keydown", (e) => { if (e.key === "Enter") _navHook(urlIn.value.trim()); });
+  $$(".web-quick", el).forEach((b) => b.addEventListener("click", () => _navHook(b.dataset.u)));
+
+  $(".web-fontup", el).addEventListener("click", () => reader && reader.setFontScale(reader.fontScale * 1.15));
+  $(".web-fontdn", el).addEventListener("click", () => reader && reader.setFontScale(reader.fontScale / 1.15));
+
+  /* optional TRUE live capture — desktops only */
+  $(".web-livecast", el).addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     if (window._castStream) { stopWebCast(); btn.classList.remove("active"); return; }
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      toast("Live cast is not supported on this browser. Tip: open the page as PDF/Image instead.", "err", 6000);
-      return;
-    }
     try {
       const cast = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: COMP.fps }, audio: false,
@@ -565,9 +605,9 @@ function initWeb(side, inst) {
       stageStream = newStage;
       if (room) room.setStageStream(stageStream);
       btn.classList.add("active");
-      toast("📡 Casting LIVE — students now see this browser (choose 'This tab' for best quality).", "ok", 6000);
+      toast("🎥 LIVE tab capture — students see the real browser.", "ok", 6000);
     } catch {
-      toast("Cast cancelled. Students still see the placeholder for the browser pane.", "", 5000);
+      toast("Live capture unavailable here — Reader Cast is already streaming the page.", "", 5000);
     }
   });
 }
@@ -1055,8 +1095,17 @@ function drawPaneInto(ctx, side, x, y, w, h, headH) {
       ctx.fillText(inst.getTimerText(), cx + cw / 2, cy + ch / 2);
       ctx.textAlign = "left";
     } else if (st.app === "web") {
-      drawPlaceholder(ctx, cx, cy, cw, ch,
-        "🌐 Web resource on teacher's screen", "The teacher can tap 📡 Cast to show it live.", "");
+      /* v6.2: Reader Cast canvas IS drawable — students see the page */
+      const rc = inst && inst.getReaderCanvas && inst.getReaderCanvas();
+      if (rc && rc.width) {
+        const s = Math.min(cw / rc.width, ch / rc.height);
+        const dw = rc.width * s, dh = rc.height * s;
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(cx, cy, cw, ch);
+        ctx.drawImage(rc, cx + (cw - dw) / 2, cy + (ch - dh) / 2, dw, dh);
+      } else {
+        drawPlaceholder(ctx, cx, cy, cw, ch,
+          "🌐 Web resource on teacher's screen", "Teacher: tap 📡 Cast to stream this page here.", "");
+      }
     } else {
       drawPlaceholder(ctx, cx, cy, cw, ch, "Nothing to show yet");
     }
