@@ -68,6 +68,7 @@
   <button class="btn icon" id="sBtnReact" title="Send a reaction">😀</button>
   <button class="btn icon" id="sBtnChat" title="Chat">💬</button>
   <button class="btn icon" id="sBtnCam" title="My camera">📷</button>
+  <button class="btn icon" id="sBtnScreen" title="Share my screen with the teacher">🖥</button>
   <button class="btn icon" id="sBtnMic" title="My mic (teacher must allow)" disabled>🎙</button>
   <button class="btn icon" id="sBtnFull" title="Fullscreen">⛶</button>
   <button class="btn icon danger" id="sBtnLeave" title="Leave">🚪</button>
@@ -78,6 +79,9 @@
   <div class="drawer-head">💬 Class chat <button class="btn small ghost" id="sChatClose">✕</button></div>
   <div class="drawer-body" id="sChatList"></div>
   <div class="drawer-foot">
+    <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text-dim);margin-bottom:6px">
+      <input type="checkbox" id="sChatPriv" /> 🔒 Send privately to teacher only
+    </label>
     <div class="chat-input-row">
       <input class="input" id="sChatInput" placeholder="Ask a question…" maxlength="500" />
       <button class="btn primary" id="sChatSend">➤</button>

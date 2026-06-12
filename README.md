@@ -1,4 +1,11 @@
-# HMG ACADEMY CLASS DECK (v4) — Split-Screen Teaching Studio 🧑‍🏫
+# HMG ACADEMY CLASS DECK (v5) — Split-Screen Teaching Studio 🧑‍🏫
+
+**By Adewale Samson Adeagbo** — AI-Augmented Solutions Developer · Data Scientist · STEM Educator (Lagos, Nigeria).
+Founder of HMG ACADEMY and the HMG family of brands:
+[cssadewale.pages.dev](https://cssadewale.pages.dev) · [hmgacademy.pages.dev](https://hmgacademy.pages.dev) ·
+[hmgconcepts.pages.dev](https://hmgconcepts.pages.dev) · [hmgtechnologies.pages.dev](https://hmgtechnologies.pages.dev) ·
+[hmgmedia.pages.dev](https://hmgmedia.pages.dev) · [hmggospel.pages.dev](https://hmggospel.pages.dev)
+*The official HMG ACADEMY logo and founder photo are embedded on the landing page (assets/).*
 
 A **free, lightweight, installable (PWA) teaching platform** built for teachers who
 teach from a tablet (e.g. itel Vista Tab 30s) and were being thrown out of
@@ -58,7 +65,23 @@ nothing for Android to kill.
 
 ---
 
-# 🆕🆕🆕 What's new in v4 (everything from v1 + v2 + v3 is still here)
+# 🆕 What's new in v5 (everything from v1–v4 is still here)
+
+| # | Feature | Detailed explanation |
+|---|---------|----------------------|
+| 1 | **🖥 Student screen sharing** | Students get a 🖥 button: one tap shares their screen with you (show their working, their homework document, their error message). You can also *request* it from the roster (🖥 next to each name — they must consent). The shared screen appears **enlarged** in your 👥 drawer's media grid and the drawer opens automatically. Sharing stops from either side; if the student stops from the browser's own UI it is detected and cleaned up. |
+| 2 | **🕐 Student lobby (join before the teacher)** | Students no longer get "class not found" if they're early. The join page puts them in a **lobby**: it quietly retries every 8 seconds and **auto-joins them the instant you go live** — with a wake-lock so their phone doesn't sleep. They can cancel waiting any time. Combine with the v4 waiting room if you also want manual admission. |
+| 3 | **⚡ Professional reconnection (no more lost classes)** | Two halves: **(a) Teacher auto-resume** — if your studio reloads mid-class (crash, refresh, tablet restart), a green bar appears: "Your class was interrupted — ▶ Resume class now". One tap restarts the same room code. **(b) Student auto-reconnect** — students no longer drop to the join screen; they keep the stage with a "reconnecting" banner and silently retry with backoff for **up to 10 minutes**, snapping back the moment you're live again. Net effect: teacher leaves & re-enters → the class reassembles itself; nobody manually rejoins. |
+| 4 | **🧰 Educational toolkit pane** | A new pane app (🧰 tab) packed with instructional materials, all **drawn locally on canvas** so they are crisp at any size, work offline, and are **included in the live broadcast and Meet/Zoom screen shares**: • **⚛ Periodic table** — all 118 elements, colour-coded by category with legend; tap any element for a detail card (name, atomic number, mass, category). • **🧪 Laboratory equipment** — 12 standard apparatus line diagrams (beaker, conical flask, burette, pipette, Bunsen burner, tripod & gauze…); tap one for an enlarged view with its use. • **🌿 Plant cell / 🐾 Animal cell** — labelled diagrams (nucleus, mitochondria, vacuole, chloroplasts, ribosomes, Golgi body, wall/membrane). • **📏 Units of measurement** — six reference cards (SI base units, metric prefixes, length, mass & volume, time & speed, common formulas); tap to flip. • **🔁 Unit converter** — Length, Mass, Time, Area, Volume, Speed, Temperature with live result rendered large for the class. • **✖ Multiplication table** — interactive up to 20×20; tap a cell and the row/column highlight with the product displayed huge. |
+| 5 | **🔭 PDF zoom/scroll now syncs to students** | Bug fixed: the broadcast used to send the whole PDF page regardless of your zoom. Now the composite streams **exactly the visible region** — your zoom level and scroll position — so when you zoom into a diagram, students zoom with you (annotations included, correctly cropped). |
+| 6 | **👩‍🏫 Multi-teacher, simultaneous classes** | The platform was already multi-tenant by design — every browser/device generates its **own room code**, giving each teacher an isolated star network on the same free deployment (PeerJS IDs never collide; bandwidth is per-teacher, not shared). v5 makes this explicit: an **↺ button beside the room code** instantly issues a fresh room (two teachers sharing one tablet, or a teacher running morning/evening groups), and the docs explain the model. Unlimited teachers can use one deployed URL at the same time, free. |
+| 7 | **🔒 Private chat (Zoom feature)** | Students can tick "send privately to teacher only" — the message reaches you alone, marked 🔒. You can tick "reply privately" to answer just that student. Great for shy students or personal matters. |
+| 8 | **🏷 Brand-embedded launch page** | The landing page now opens with the **official HMG ACADEMY logo** and a founder card — your photo, name, title ("AI-Augmented Solutions Developer · Data Scientist · STEM Educator — Lagos, Nigeria") and clickable links to all six HMG sites — so every user (and their parents) sees the brand and can become a customer. Both images were downloaded from your live sites into `assets/`. |
+| 9 | **🐞 Bug fixes from deep diagnosis** | • **PIN race fixed** — the v4 PIN was applied via a 1.2 s `setTimeout` after Go Live; a fast student could join PIN-free. Now set atomically before the room opens, and Settings changes apply live. • **Media-call leak fixed** — when a student left, their camera/screen `MediaConnection`s were never closed (slow memory/socket leak across a long class). Now closed on drop. • **Composite-loop hardening** — pane draw errors can no longer kill the broadcast frame. • **Service-worker shell updated** — new files (toolkit.js, brand images) pre-cached; version bumped to v5.0.0 for clean auto-update. • **Lobby/cleanup paths** — student-side teardown now consistently releases wake-locks and PeerJS objects. |
+
+---
+
+# 🆕🆕🆕 What was new in v4 (still here)
 
 v4 directly answers ten field-tested issues. Feature-by-feature:
 

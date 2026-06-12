@@ -5,7 +5,7 @@
    whiteboard/PDF/notes work fully offline).
    Bump CACHE_VERSION whenever you deploy changes.
    ============================================================ */
-const CACHE_VERSION = "hmg-classdeck-v4.0.0";
+const CACHE_VERSION = "hmg-classdeck-v5.0.0";
 
 const SHELL = [
   "./",
@@ -17,12 +17,15 @@ const SHELL = [
   "./js/whiteboard.js",
   "./js/rtc.js",
   "./js/teach.js",
+  "./js/toolkit.js",
   "./js/join.js",
   "./vendor/peerjs.min.js",
   "./vendor/pdf.min.js",
   "./vendor/pdf.worker.min.js",
   "./vendor/qrcode.min.js",
   "./assets/icon-96.png",
+  "./assets/hmg-academy-logo.png",
+  "./assets/founder-photo.jpg",
   "./assets/icon-192.png",
   "./assets/icon-512.png",
   "./assets/apple-touch-icon.png",
