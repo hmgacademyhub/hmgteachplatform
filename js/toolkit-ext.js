@@ -1,6 +1,6 @@
 /* ============================================================
    HMG ACADEMY CLASS DECK v6 — Toolkit extensions
-   Adds 15+ interactive tools + an 93-card reference library
+   Adds 15+ interactive tools + an 161-card reference library
    (toolkit-data.js) to the v5 Toolkit class = 100+ tools.
 
    Interactive tools:
@@ -18,7 +18,7 @@
      ⚖ balance    — algebra balance scales (solve x visually)
      🔢 hundred    — interactive hundred square (skip counting)
      🅰 letters    — letter & number formation tracing guides
-     📇 cards      — reference library browser (93 cards, search)
+     📇 cards      — reference library browser (161 cards, search)
    ============================================================ */
 "use strict";
 
@@ -840,7 +840,7 @@ Toolkit.prototype._drawLetters = function () {
 };
 
 /* ============================================================
-   📇 REFERENCE LIBRARY (93 cards from toolkit-data.js)
+   📇 REFERENCE LIBRARY (161 cards from toolkit-data.js)
    ============================================================ */
 Toolkit.prototype._cardsFiltered = function () {
   const cd = this._ext.cd;

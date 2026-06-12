@@ -11,8 +11,18 @@ let handUp = false;
 let myCamOn = false, myMicOn = false, micAllowed = false;
 
 const qs = new URLSearchParams(location.search);
-if (qs.get("room")) $("#inRoom").value = qs.get("room").toUpperCase();
+if (qs.get("room")) {
+  /* v6 (issue 1): class links take students STRAIGHT to the studio —
+     the room is pre-filled and hidden; they only type their name and join.
+     Admission then depends on the teacher's approval (waiting room). */
+  $("#inRoom").value = qs.get("room").toUpperCase();
+  const wrap = $("#roomFieldWrap");
+  if (wrap) wrap.classList.add("hide");
+  const chip = $("#roomChip");
+  if (chip) { chip.textContent = "Class: " + qs.get("room").toUpperCase(); chip.classList.remove("hide"); }
+}
 $("#inName").value = Store.get("stuname", "");
+setTimeout(() => { try { $("#inName").focus(); } catch {} }, 300);
 
 /* ---------- join flow ---------- */
 $("#btnJoin").addEventListener("click", () => { lobbyOn ? stopLobby() : join(); });

@@ -1,108 +1,189 @@
 /* ============================================================
-   HMG ACADEMY CLASS DECK v6 — Teacher access (SaaS licensing)
-   100% free-tools approach (no backend, no database):
+   HMG ACADEMY CLASS DECK — Teacher accounts & licensing (SaaS)
+   Free-tools architecture (no paid servers):
 
-   • STUDENTS join free with a link/code — nothing changes.
-   • TEACHERS need an HMG ACCESS KEY to use the Teacher Studio.
-     - 14-day FREE TRIAL starts automatically on first use.
-     - After the trial, the teacher buys a key from HMG ACADEMY
-       (bank transfer / Paystack / Flutterwave payment link) and
-       you send them a key generated on admin.html.
-   • Keys are self-validating: HMG-<expiry>-<signature> where the
-     signature = SHA-256(SECRET + name + expiry). admin.html
-     generates them; this file verifies them offline.
-
-   ⚠ IMPORTANT: change AUTH_SECRET below (and in admin.html —
-   it asks you to type the same secret) BEFORE deploying.
-   This is honest-security for a low-cost product: it keeps
-   casual users out without paying for servers. For bank-grade
-   licensing later, move validation to a free Cloudflare Worker.
+   • STUDENTS: join free with link/code — never see any of this.
+   • TEACHERS: MUST sign up (name, email, phone, school, password)
+     before the Studio unlocks. Then:
+       - 3-DAY FREE TRIAL starts at signup.
+       - After the trial they activate a personal HMG ACCESS KEY
+         bought from HMG ACADEMY (generated on admin.html).
+   • Security measures (best possible without a backend):
+       - Passwords are never stored: only SHA-256(salt|pw|secret).
+       - Session is per-browser-session (sessionStorage) — closing
+         the browser requires login again.
+       - The gate is a full-screen lock rendered before any class
+         can start; Go Live / recording / invites are also blocked
+         at function level, not just visually.
+       - License keys are name-bound + expiry-bound + signed
+         (SHA-256), validated offline; tampering invalidates them.
+       - Trial clock is signed too, so editing localStorage resets
+         the account instead of extending the trial.
+   ⚠ Change AUTH_SECRET before deploying (same phrase in admin.html).
+   For centrally revocable accounts later, move validation to a free
+   Cloudflare Worker (see docs/DEPLOYMENT.md Part 9).
    ============================================================ */
 "use strict";
 
-const AUTH_SECRET = "HelpbyGod";   /* ← set your own private phrase */
-const TRIAL_DAYS = 14;
-const HMG_PAY_INFO =
-  "To get your HMG ACCESS KEY:\n" +
-  "1. Pay the small license fee (see hmgacademy.pages.dev or contact us)\n" +
-  "2. Send your full name + payment proof via WhatsApp/email\n" +
-  "3. Receive your personal key instantly and activate below.";
+const AUTH_SECRET = "CHANGE-ME-HMG-2026";   /* ← set your own private phrase */
+const TRIAL_DAYS = 3;
 
 async function sha256Hex(str) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/* key = HMG-<YYYYMM base36-ish, just YYYYMM>-<10 hex sig> */
-async function makeKey(name, expiryYYYYMM, secret) {
-  const sig = (await sha256Hex((secret || AUTH_SECRET) + "|" + name.trim().toLowerCase() + "|" + expiryYYYYMM)).slice(0, 10).toUpperCase();
-  return "HMG-" + expiryYYYYMM + "-" + sig;
-}
-
+/* ---------- license keys (generated on admin.html) ---------- */
 async function validateKey(name, key) {
   const m = String(key).trim().toUpperCase().match(/^HMG-(\d{6})-([0-9A-F]{10})$/);
-  if (!m) return { ok: false, why: "Key format is invalid. It looks like HMG-202612-XXXXXXXXXX" };
+  if (!m) return { ok: false, why: "Key format is invalid (looks like HMG-202612-XXXXXXXXXX)." };
   const expiry = m[1];
   const yy = Number(expiry.slice(0, 4)), mm = Number(expiry.slice(4, 6));
   if (mm < 1 || mm > 12) return { ok: false, why: "Key expiry is invalid." };
-  const now = new Date();
-  const expEnd = new Date(yy, mm, 1); // first day of month AFTER expiry month
-  if (now >= expEnd) return { ok: false, why: "This key expired in " + expiry.slice(0, 4) + "-" + expiry.slice(4) + ". Please renew." };
+  if (new Date() >= new Date(yy, mm, 1)) return { ok: false, why: "This key expired (" + expiry.slice(0, 4) + "-" + expiry.slice(4) + "). Please renew." };
   const expect = (await sha256Hex(AUTH_SECRET + "|" + name.trim().toLowerCase() + "|" + expiry)).slice(0, 10).toUpperCase();
-  if (expect !== m[2]) return { ok: false, why: "Key does not match this name. Use the exact name you registered with." };
+  if (expect !== m[2]) return { ok: false, why: "Key does not match this account name." };
   return { ok: true, expiry: expiry.slice(0, 4) + "-" + expiry.slice(4) };
 }
 
-/* ---------------- teacher gate ---------------- */
-function authState() {
-  const lic = Store.get("license", null);            // {name, key, expiry}
-  let trialStart = Store.get("trial_start", null);
-  if (!trialStart) { trialStart = Date.now(); Store.set("trial_start", trialStart); }
-  const trialLeft = Math.ceil((trialStart + TRIAL_DAYS * 86400000 - Date.now()) / 86400000);
-  return { lic, trialLeft };
+/* ---------- account store (signed against tampering) ---------- */
+async function _signAccount(acc) {
+  return sha256Hex(AUTH_SECRET + "|" + acc.email + "|" + acc.hash + "|" + acc.created);
+}
+async function getAccount() {
+  const acc = Store.get("account", null);
+  if (!acc) return null;
+  if ((await _signAccount(acc)) !== acc.sig) { Store.set("account", null); return null; } // tampered
+  return acc;
 }
 
-async function requireTeacherAccess() {
-  const { lic, trialLeft } = authState();
-  if (lic) {
-    const v = await validateKey(lic.name, lic.key);
-    if (v.ok) {
-      _showAuthBadge("✓ Licensed to " + lic.name + " (until " + v.expiry + ")");
-      return true;
-    }
-    Store.set("license", null); // expired/invalid — fall through
-  }
-  if (trialLeft > 0) {
-    _showAuthBadge("🎁 Free trial — " + trialLeft + " day" + (trialLeft === 1 ? "" : "s") + " left");
-    if (trialLeft <= 4) setTimeout(() => openModal("#mAuth"), 1200);
-    return true;
-  }
-  _authLock();
-  return false;
+async function signupTeacher() {
+  const name = $("#suName").value.trim();
+  const email = $("#suEmail").value.trim().toLowerCase();
+  const phone = $("#suPhone").value.trim();
+  const school = $("#suSchool").value.trim();
+  const pw = $("#suPw").value;
+  const pw2 = $("#suPw2").value;
+  const err = (m) => { $("#suStatus").textContent = m; };
+  if (name.length < 3) return err("Enter your full name.");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return err("Enter a valid email address.");
+  if (phone.length < 7) return err("Enter a valid phone number (for your access key delivery).");
+  if (pw.length < 6) return err("Password must be at least 6 characters.");
+  if (pw !== pw2) return err("Passwords do not match.");
+  const salt = randomCode(10);
+  const hash = await sha256Hex(salt + "|" + pw + "|" + AUTH_SECRET);
+  const acc = { name, email, phone, school, salt, hash, created: Date.now() };
+  acc.sig = await _signAccount(acc);
+  Store.set("account", acc);
+  Store.set("license", null);
+  sessionStorage.setItem("hmg_session", "1");
+  $("#suStatus").textContent = "";
+  toast("🎉 Welcome, " + name + "! Your " + TRIAL_DAYS + "-day free trial has started.", "ok", 6000);
+  finishAuth();
 }
 
-function _showAuthBadge(text) {
-  const el = $("#authBadge");
-  if (el) { el.textContent = text; el.classList.remove("hide"); }
-}
-
-function _authLock() {
-  const gate = $("#authGate");
-  if (gate) gate.classList.remove("hide");
-  openModal("#mAuth");
+async function loginTeacher() {
+  const email = $("#liEmail").value.trim().toLowerCase();
+  const pw = $("#liPw").value;
+  const acc = await getAccount();
+  if (!acc) { $("#liStatus").textContent = "No account found on this device — please sign up."; switchAuthTab("signup"); return; }
+  if (acc.email !== email) { $("#liStatus").textContent = "Email does not match the registered account."; return; }
+  const hash = await sha256Hex(acc.salt + "|" + pw + "|" + AUTH_SECRET);
+  if (hash !== acc.hash) { $("#liStatus").textContent = "Incorrect password."; return; }
+  sessionStorage.setItem("hmg_session", "1");
+  $("#liStatus").textContent = "";
+  toast("Welcome back, " + acc.name + "!", "ok");
+  finishAuth();
 }
 
 async function activateLicense() {
-  const name = $("#authName").value.trim();
+  const acc = await getAccount();
   const key = $("#authKey").value.trim();
-  if (!name || !key) { $("#authStatus").textContent = "Enter both your registered name and your key."; return; }
-  const v = await validateKey(name, key);
+  if (!acc) { switchAuthTab("signup"); return; }
+  if (!key) { $("#authStatus").textContent = "Paste the key you received from HMG ACADEMY."; return; }
+  const v = await validateKey(acc.name, key);
   if (!v.ok) { $("#authStatus").textContent = "❌ " + v.why; return; }
-  Store.set("license", { name, key: key.toUpperCase(), expiry: v.expiry });
+  Store.set("license", { key: key.toUpperCase(), expiry: v.expiry });
   $("#authStatus").textContent = "";
-  closeModal("#mAuth");
+  sessionStorage.setItem("hmg_session", "1");
+  toast("🎉 License active until " + v.expiry + ". Thank you, " + acc.name + "!", "ok", 6000);
+  finishAuth();
+}
+
+/* ---------- gate logic ---------- */
+window.HMG_AUTH_OK = false;
+
+function switchAuthTab(tab) {
+  $$(".auth-tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
+  $$(".auth-pane").forEach((p) => p.classList.toggle("hide", p.dataset.tab !== tab));
+}
+
+function trialDaysLeft(acc) {
+  return Math.ceil((acc.created + TRIAL_DAYS * 86400000 - Date.now()) / 86400000);
+}
+
+async function requireTeacherAccess() {
   const gate = $("#authGate");
-  if (gate) gate.classList.add("hide");
-  _showAuthBadge("✓ Licensed to " + name + " (until " + v.expiry + ")");
-  toast("🎉 Welcome, " + name + "! Your HMG ACADEMY CLASS DECK license is active.", "ok", 6000);
+  const acc = await getAccount();
+
+  if (!acc) {                                       // brand new → sign up
+    gate.classList.remove("hide");
+    switchAuthTab("signup");
+    return false;
+  }
+  if (!sessionStorage.getItem("hmg_session")) {     // returning → log in
+    gate.classList.remove("hide");
+    switchAuthTab("login");
+    $("#liEmail").value = acc.email;
+    return false;
+  }
+  // logged in → check entitlement
+  const lic = Store.get("license", null);
+  if (lic) {
+    const v = await validateKey(acc.name, lic.key);
+    if (v.ok) { _authPass(acc, "✓ " + acc.name + " · licensed until " + v.expiry); return true; }
+    Store.set("license", null);
+  }
+  const left = trialDaysLeft(acc);
+  if (left > 0) {
+    _authPass(acc, "🎁 " + acc.name + " · trial: " + left + " day" + (left === 1 ? "" : "s") + " left");
+    if (left <= 1) setTimeout(() => { switchAuthTab("license"); gate.classList.remove("hide"); $("#authSkip").classList.remove("hide"); }, 1200);
+    return true;
+  }
+  // trial over, no license → locked on the license tab
+  gate.classList.remove("hide");
+  switchAuthTab("license");
+  $("#authSkip").classList.add("hide");
+  $("#authStatus").textContent = "Your free trial has ended. Activate your HMG ACCESS KEY to continue.";
+  return false;
+}
+
+function _authPass(acc, badgeText) {
+  window.HMG_AUTH_OK = true;
+  $("#authGate").classList.add("hide");
+  const el = $("#authBadge");
+  if (el) {
+    el.textContent = badgeText;
+    el.classList.remove("hide");
+    el.title = "Tap to log out";
+    el.onclick = () => {
+      if (confirm("Log out of the Teacher Studio?")) {
+        sessionStorage.removeItem("hmg_session");
+        location.reload();
+      }
+    };
+  }
+}
+
+function finishAuth() { requireTeacherAccess(); }
+
+/* dismiss (only allowed while trial still valid) */
+function authSkip() { $("#authGate").classList.add("hide"); }
+
+/* enforcement hooks — block core actions even if the overlay is removed */
+function authEnforce() {
+  if (window.HMG_AUTH_OK) return true;
+  requireTeacherAccess();
+  toast("Please sign in to use the Teacher Studio.", "err");
+  return false;
 }

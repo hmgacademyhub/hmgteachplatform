@@ -20,7 +20,7 @@ if (window.pdfjsLib) {
 /* ------------------------------------------------------------
    1. Pane / app management
    ------------------------------------------------------------ */
-const APPS = ["board", "pdf", "web", "notes", "image", "graph", "video", "toolkit"];
+const APPS = ["board", "pdf", "web", "notes", "image", "graph", "video", "toolkit", "flash", "stopwatch"];
 const paneState = {
   L: { app: Store.get("pane_L", "board"), instances: {} },
   R: { app: Store.get("pane_R", "pdf"),   instances: {} }
@@ -75,6 +75,100 @@ function initApp(side, app, inst) {
   else if (app === "graph") initGraph(side, inst);   // v4
   else if (app === "video") initVideo(side, inst);   // v4
   else if (app === "toolkit") initToolkit(side, inst); // v5
+  else if (app === "flash") initFlash(side, inst);       // v6
+  else if (app === "stopwatch") initStopwatch(side, inst); // v6
+}
+
+/* ---- v6: flashcards pane ---- */
+function initFlash(side, inst) {
+  const el = inst.el;
+  let cards = Store.get("flashcards", [["Photosynthesis", "The process by which green plants make their own food using sunlight, water and carbon dioxide."], ["7 × 8", "56"], ["Capital of Nigeria", "Abuja"]]);
+  let idx = 0, front = true;
+  const textEl = $(".fc-text", el), posEl = $(".fc-pos", el), cardEl = $(".fc-card", el);
+  inst.getFlashState = () => ({ text: textEl.textContent, front, pos: posEl.textContent });
+  function render() {
+    if (!cards.length) { textEl.textContent = "Tap ✏ Edit cards to add your flashcards"; posEl.textContent = "0 / 0"; return; }
+    idx = ((idx % cards.length) + cards.length) % cards.length;
+    textEl.textContent = front ? cards[idx][0] : cards[idx][1];
+    cardEl.style.background = front ? "#fff" : "#fff8e1";
+    cardEl.style.borderColor = front ? "#1e2a78" : "#f59e0b";
+    posEl.textContent = (idx + 1) + " / " + cards.length + (front ? "" : "  (answer)");
+  }
+  $(".fc-stage", el).addEventListener("click", () => { front = !front; render(); });
+  $(".fc-prev", el).addEventListener("click", () => { idx--; front = true; render(); });
+  $(".fc-next", el).addEventListener("click", () => { idx++; front = true; render(); });
+  $(".fc-shuffle", el).addEventListener("click", () => {
+    for (let i = cards.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [cards[i], cards[j]] = [cards[j], cards[i]]; }
+    idx = 0; front = true; render(); toast("Cards shuffled");
+  });
+  const editor = $(".fc-editor", el);
+  $(".fc-edit", el).addEventListener("click", () => {
+    if (editor.classList.contains("hide")) {
+      editor.value = cards.map((c) => c[0] + " | " + c[1]).join("\n");
+      editor.classList.remove("hide");
+    } else {
+      cards = editor.value.split("\n").map((l) => l.split("|").map((s) => s.trim())).filter((c) => c.length >= 2 && c[0] && c[1]);
+      Store.set("flashcards", cards);
+      editor.classList.add("hide");
+      idx = 0; front = true; render();
+      toast("💾 " + cards.length + " card(s) saved", "ok");
+    }
+  });
+  render();
+}
+
+/* ---- v6: stopwatch / countdown pane (big classroom timer) ---- */
+function initStopwatch(side, inst) {
+  const el = inst.el;
+  const disp = $(".sw-display", el), lapsEl = $(".sw-laps", el);
+  let mode = "stopwatch", running = false, t0 = 0, acc = 0, cdTotal = 0, raf = null, laps = [];
+  inst.getTimerText = () => disp.textContent;
+  function fmt(ms) {
+    ms = Math.max(0, ms);
+    const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000), d = Math.floor((ms % 1000) / 100);
+    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0") + "." + d;
+  }
+  function tick() {
+    raf = requestAnimationFrame(tick);
+    const elapsed = acc + (running ? Date.now() - t0 : 0);
+    if (mode === "stopwatch") disp.textContent = fmt(elapsed);
+    else {
+      const left = cdTotal - elapsed;
+      disp.textContent = fmt(left);
+      disp.style.color = left < 10000 ? "#ff5d5d" : "#fff";
+      if (left <= 0 && running) { running = false; acc = cdTotal; toast("⏳ Time is up!", "ok", 5000); if (room) room.sendAnnouncement("⏳ Time is up!"); }
+    }
+  }
+  $(".sw-mode", el).addEventListener("change", (e) => {
+    mode = e.target.value;
+    $(".sw-cdbar", el).classList.toggle("hide", mode !== "countdown");
+    running = false; acc = 0; laps = []; lapsEl.innerHTML = "";
+    disp.style.color = "#fff";
+    disp.textContent = mode === "countdown" ? fmt((Number($(".sw-mins", el).value) * 60 + Number($(".sw-secs", el).value)) * 1000) : "00:00.0";
+  });
+  $(".sw-start", el).addEventListener("click", (e) => {
+    if (!running) {
+      if (mode === "countdown" && acc === 0) cdTotal = (Number($(".sw-mins", el).value) * 60 + Number($(".sw-secs", el).value)) * 1000;
+      running = true; t0 = Date.now();
+      e.currentTarget.textContent = "⏸ Pause";
+      if (!raf) tick();
+    } else {
+      running = false; acc += Date.now() - t0;
+      e.currentTarget.textContent = "▶ Start";
+    }
+  });
+  $(".sw-lap", el).addEventListener("click", () => {
+    if (mode !== "stopwatch") return;
+    laps.unshift(disp.textContent);
+    lapsEl.innerHTML = laps.slice(0, 8).map((l, i) => "Lap " + (laps.length - i) + ": " + l).join("<br/>");
+  });
+  $(".sw-reset", el).addEventListener("click", () => {
+    running = false; acc = 0; laps = []; lapsEl.innerHTML = "";
+    disp.style.color = "#fff";
+    $(".sw-start", el).textContent = "▶ Start";
+    disp.textContent = mode === "countdown" ? fmt((Number($(".sw-mins", el).value) * 60 + Number($(".sw-secs", el).value)) * 1000) : "00:00.0";
+  });
+  tick();
 }
 
 /* ---- v5/v6: educational toolkit pane (100+ tools) ---- */
@@ -445,6 +539,46 @@ function initWeb(side, inst) {
   $(".web-reload", el).addEventListener("click", () => { frame.src = frame.src; });
   $(".web-pop", el).addEventListener("click", () => { if (urlIn.value) window.open(/^https?:/i.test(urlIn.value) ? urlIn.value : "https://" + urlIn.value, "_blank"); });
   $$(".web-quick", el).forEach((b) => b.addEventListener("click", () => nav(b.dataset.u)));
+
+  /* ----- v6 (issue 3): 📡 CAST — students see the browser live -----
+     Browsers forbid reading iframe pixels into a canvas, so the composite
+     can never contain the web pane. The fix: one tap on 📡 Cast switches
+     the stage to a LIVE TAB/SCREEN CAPTURE (getDisplayMedia) — students
+     then see the real browser (scrolling, videos, everything) in the same
+     stream. Tap again (or stop the share) to return to composite mode. */
+  $(".web-cast", el).addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    if (window._castStream) { stopWebCast(); btn.classList.remove("active"); return; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      toast("Live cast is not supported on this browser. Tip: open the page as PDF/Image instead.", "err", 6000);
+      return;
+    }
+    try {
+      const cast = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: COMP.fps }, audio: false,
+        preferCurrentTab: true, selfBrowserSurface: "include"
+      });
+      window._castStream = cast;
+      cast.getVideoTracks()[0].addEventListener("ended", () => { stopWebCast(); btn.classList.remove("active"); });
+      const newStage = new MediaStream(cast.getVideoTracks());
+      if (micStream) micStream.getAudioTracks().forEach((t) => newStage.addTrack(t));
+      stageStream = newStage;
+      if (room) room.setStageStream(stageStream);
+      btn.classList.add("active");
+      toast("📡 Casting LIVE — students now see this browser (choose 'This tab' for best quality).", "ok", 6000);
+    } catch {
+      toast("Cast cancelled. Students still see the placeholder for the browser pane.", "", 5000);
+    }
+  });
+}
+
+function stopWebCast() {
+  if (window._castStream) {
+    window._castStream.getTracks().forEach((t) => t.stop());
+    window._castStream = null;
+  }
+  startCompositeStage();   // back to the normal split-screen broadcast
+  toast("Back to normal broadcast (split-screen composite).", "ok");
 }
 
 /* ---- notes ---- */
@@ -826,7 +960,7 @@ function drawPaneInto(ctx, side, x, y, w, h, headH) {
   ctx.fillStyle = "#eef1ff";
   ctx.font = "bold 15px system-ui, sans-serif";
   ctx.textBaseline = "middle";
-  const titles = { board: "✏ Whiteboard", pdf: "📄 Learning material", web: "🌐 Web resource", notes: "🗒 Notes", image: "🖼 Image", graph: "📈 Graph", video: "🎬 Video", toolkit: "🧰 Toolkit" };
+  const titles = { board: "✏ Whiteboard", pdf: "📄 Learning material", web: "🌐 Web resource", notes: "🗒 Notes", image: "🖼 Image", graph: "📈 Graph", video: "🎬 Video", toolkit: "🧰 Toolkit", flash: "🃏 Flashcards", stopwatch: "⏱ Timer" };
   ctx.fillText(titles[st.app] || st.app, x + 12, y + headH / 2);
 
   const cx = x, cy = y + headH, cw = w, ch = h - headH;
@@ -901,9 +1035,28 @@ function drawPaneInto(ctx, side, x, y, w, h, headH) {
       const dw = vEl.videoWidth * s, dh = vEl.videoHeight * s;
       ctx.fillStyle = "#000"; ctx.fillRect(cx, cy, cw, ch);
       ctx.drawImage(vEl, cx + (cw - dw) / 2, cy + (ch - dh) / 2, dw, dh);
+    } else if (st.app === "flash" && inst && inst.getFlashState) {       /* v6 */
+      const fs2 = inst.getFlashState();
+      ctx.fillStyle = "#f6f8ff"; ctx.fillRect(cx, cy, cw, ch);
+      const pad = Math.min(cw, ch) * 0.1;
+      ctx.fillStyle = fs2.front ? "#ffffff" : "#fff8e1";
+      ctx.strokeStyle = fs2.front ? "#1e2a78" : "#f59e0b"; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.roundRect(cx + pad, cy + pad, cw - pad * 2, ch - pad * 2, 16); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#1e2a78"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.font = "bold " + Math.max(16, Math.round(cw / 22)) + "px system-ui";
+      wrapTextCentred(ctx, fs2.text, cx + cw / 2, cy + ch / 2, cw - pad * 3, Math.max(20, Math.round(cw / 18)));
+      ctx.font = Math.max(11, Math.round(cw / 50)) + "px system-ui"; ctx.fillStyle = "#888";
+      ctx.fillText(fs2.pos, cx + cw / 2, cy + ch - pad / 2);
+      ctx.textAlign = "left";
+    } else if (st.app === "stopwatch" && inst && inst.getTimerText) {     /* v6 */
+      ctx.fillStyle = "#10142b"; ctx.fillRect(cx, cy, cw, ch);
+      ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.font = "800 " + Math.round(Math.min(cw / 6, ch / 3)) + "px system-ui";
+      ctx.fillText(inst.getTimerText(), cx + cw / 2, cy + ch / 2);
+      ctx.textAlign = "left";
     } else if (st.app === "web") {
       drawPlaceholder(ctx, cx, cy, cw, ch,
-        "🌐 Web resource open on teacher's screen", "Browsers block iframe capture for privacy.", "Tip: use 'Share screen' broadcast mode, or show the page via PDF/Image.");
+        "🌐 Web resource on teacher's screen", "The teacher can tap 📡 Cast to show it live.", "");
     } else {
       drawPlaceholder(ctx, cx, cy, cw, ch, "Nothing to show yet");
     }
@@ -952,6 +1105,20 @@ function drawPlaceholder(ctx, x, y, w, h, l1, l2, l3) {
   ctx.textAlign = "left";
 }
 
+function wrapTextCentred(ctx, text, cx2, cy2, maxW, lineH) {
+  const words = String(text).split(" ");
+  const lines = [];
+  let cur = "";
+  for (const w of words) {
+    const t = cur ? cur + " " + w : w;
+    if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; }
+    else cur = t;
+  }
+  lines.push(cur);
+  const startY = cy2 - ((lines.length - 1) * lineH) / 2;
+  lines.forEach((l, i) => ctx.fillText(l, cx2, startY + i * lineH));
+}
+
 function wrapText(ctx, text, x, y, maxW, lineH) {
   const lines = text.split("\n");
   let yy = y;
@@ -990,6 +1157,7 @@ function studentLink() {
 
 /* invite modal */
 $("#btnQR").addEventListener("click", () => {
+  if (typeof authEnforce === "function" && !authEnforce()) return;
   $("#inviteLink").value = studentLink();
   $("#inviteCode").textContent = roomCode;
   /* v4: clear join diagnostics */
@@ -1029,12 +1197,15 @@ $("#btnGoLive").addEventListener("click", goLive);
 $("#btnEndLive").addEventListener("click", endLive);
 
 async function goLive() {
+  if (typeof authEnforce === "function" && !authEnforce()) return;   /* v6: hard gate */
   $("#btnGoLive").disabled = true;
   toast("Starting class…");
   try {
     room = new TeacherRoom(roomCode, { onEvent: onRoomEvent });
     room.roomName = Store.get("roomname", "") || ("Class " + roomCode);
-    room.pin = Store.get("pin", "");        /* v5 bug-fix: PIN applied atomically
+    room.pin = Store.get("pin", "");
+    /* v6 (issue 1): teacher approval is the DEFAULT — students wait until admitted */
+    room.waitingRoom = Store.get("waitroom", true);        /* v5 bug-fix: PIN applied atomically
                                                (was a setTimeout race in v4) */
     await room.start();
 
@@ -1409,6 +1580,7 @@ $("#btnRec").addEventListener("click", () => {
   openModal("#mRecSetup");
 });
 $("#recBegin").addEventListener("click", () => {
+  if (typeof authEnforce === "function" && !authEnforce()) { closeModal("#mRecSetup"); return; }
   recMeta.subject = $("#recSubject").value.trim() || "Lesson";
   recMeta.topic = $("#recTopic").value.trim() || "";
   recMeta.klass = $("#recClass").value.trim() || "";
@@ -2326,6 +2498,7 @@ drawComposite = function () {
 $("#btnWaiting").addEventListener("click", (e) => {
   if (!room) { toast("Go live first"); return; }
   room.setWaitingRoom(!room.waitingRoom);
+  Store.set("waitroom", room.waitingRoom);
   e.currentTarget.classList.toggle("active", room.waitingRoom);
   toast(room.waitingRoom
     ? "🚪 Waiting room ON — you must admit each student"
