@@ -1,4 +1,4 @@
-# 🎓 HMG ACADEMY CLASS DECK (v7) — Quick User Guide
+# 🎓 HMG ACADEMY CLASS DECK (v8) — Quick User Guide
 
 Print this or keep it open during your first classes.
 
@@ -81,6 +81,13 @@ and your boards are exactly where you left them (autosave).
 | Play an experiment clip | pane tab 🎬 → open local video |
 | Remove someone | 👥 → ✕ next to their name |
 | Run a scored quiz | 🏆 → type/load questions (* = correct) → Start |
+| Give every student a whiteboard | 🎨 → Start boards (watch them solve live) |
+| Send your board to all students | 🎨 → 📤 Push my board |
+| Quick word cloud / open question | 🧩 → choose type → Start |
+| End-of-class exit ticket | 🧩 → Exit ticket |
+| Reward a student | ⭐ 🤝 💡 buttons beside their name in 👥 |
+| Make random groups | 👥 → Groups |
+| Calm a noisy class | 🧰 → Noise meter |
 | Show the periodic table / cells / lab kit | pane tab 🧰 → choose the tool |
 | Convert units live for the class | 🧰 → Unit converter |
 | See a student's screen/work | 👥 → 🖥 next to their name (they consent) |
