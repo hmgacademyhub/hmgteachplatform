@@ -1,4 +1,4 @@
-# 🎓 HMG ACADEMY CLASS DECK (v6) — Quick User Guide
+# 🎓 HMG ACADEMY CLASS DECK (v7) — Quick User Guide
 
 Print this or keep it open during your first classes.
 

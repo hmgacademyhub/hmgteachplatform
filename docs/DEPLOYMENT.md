@@ -1,10 +1,10 @@
-# 🚀 HMG ACADEMY CLASS DECK (v6) — Deployment Guide (step by step, free tools only)
+# 🚀 HMG ACADEMY CLASS DECK (v7) — Deployment Guide (step by step, free tools only)
 
-> v6 note: deployment is identical to earlier versions — it is still a pure static site
+> v7 note: deployment is identical to earlier versions — it is still a pure static site
 > with no build step. If you already deployed an earlier version, just push
 > these files over the old ones (CACHE_VERSION in `sw.js` is already bumped to
-> v6.0.0 so installed apps auto-update). Suggested repo: `hmg-classdeck`
-> (same repo, new commit) or `hmg-classdeck-v6` to keep versions side-by-side.
+> v7.0.0 so installed apps auto-update). Suggested repo: `hmg-classdeck`
+> (same repo, new commit) or `hmg-classdeck-v7` to keep versions side-by-side.
 
 This guide assumes **zero prior DevOps experience**. Follow it top-to-bottom once;
 future updates take under a minute.
@@ -235,3 +235,25 @@ Create in Excel/Google Sheets and export as CSV:
 - Correct option: A/B/C/D or 1/2/3/4.
 - The explanation appears to each student immediately after they answer.
 - Download a ready template with the “⬇ Sample CSV” button in the Quiz drawer.
+
+---
+
+## Part 11 — v7: Revoking keys & blocking accounts (free kill-switch)
+
+1. Open `revoked.json` in your repo (GitHub web editor works).
+2. Add the leaked/refunded key or email:
+   `{ "keys": ["HMG-202612-ABCDE12345"], "blockedEmails": ["bad@user.com"] }`
+3. Commit → your host redeploys → every installed app blocks that key/email
+   the next time the Teacher Studio opens (it checks on every start; the
+   result is cached for offline use).
+
+## Part 12 — v7: Pre-deploy validation
+
+Before every push, run:  `bash scripts/validate.sh`
+It checks JS syntax, JSON validity and broken local references in one command.
+
+## Part 13 — v7: Teachers' own recording brands
+
+Each teacher sets their brand once in the ⏺ Record dialog (brand name, footer
+credit, optional logo upload). It is stored on THEIR device and appears on all
+their videos. No action needed from you as the platform owner.
