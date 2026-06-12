@@ -396,6 +396,43 @@ hr.sep { border: none; border-top: 1px solid var(--line); margin: 10px 0; }
 /* quiz tally bars reuse .poll-bar */
 .quiz-correct .poll-bar > i { background: linear-gradient(90deg, #19a85a, #2ecc71); }
 
+/* ==========================================================================
+   v6 — Teacher auth gate (signup / login / license)
+   ========================================================================== */
+.auth-gate {
+  position: fixed; inset: 0; z-index: 2000;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background:
+    radial-gradient(900px 500px at 85% -5%, rgba(123,92,255,.35), transparent 60%),
+    radial-gradient(700px 420px at 0% 105%, rgba(79,110,247,.28), transparent 60%),
+    rgba(7, 10, 25, .97);
+  backdrop-filter: blur(6px); overflow-y: auto;
+}
+.auth-card {
+  width: min(430px, 96vw); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 20px; box-shadow: var(--shadow); padding: 26px;
+  display: flex; flex-direction: column; gap: 12px; margin: auto;
+}
+.auth-brand { display: flex; gap: 12px; align-items: center; }
+.auth-brand img { height: 46px; border-radius: 10px; }
+.auth-brand b { display: block; font-size: 15.5px; }
+.auth-brand span { font-size: 12px; color: var(--text-dim); }
+.auth-tabs { display: flex; gap: 6px; background: var(--bg-2); border-radius: 12px; padding: 5px; }
+.auth-tab { flex: 1; border: none; background: transparent; color: var(--text-dim);
+  padding: 9px 4px; border-radius: 9px; cursor: pointer; font-size: 13px; font-weight: 600; }
+.auth-tab.active { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; }
+.auth-pane { display: flex; flex-direction: column; gap: 9px; }
+.auth-note { font-size: 12.5px; color: var(--text-dim); line-height: 1.55; }
+.auth-note a { color: var(--brand); }
+.auth-err { font-size: 12.5px; color: var(--danger); min-height: 16px; margin: 0; }
+.auth-cta { padding: 12px; font-size: 15px; }
+.auth-foot { text-align: center; font-size: 11px; color: var(--text-dim); }
+
+/* v6 — professional polish */
+.topbar { box-shadow: 0 2px 14px rgba(0,0,0,.25); }
+.pane-head .tab { transition: background .15s, color .15s; }
+.card button.btn { margin-top: 4px; }
+
 /* v2 — landscape phones/tablets: tighter vertical chrome */
 @media (max-height: 480px) {
   :root { --toolbar-h: 42px; }
