@@ -198,17 +198,23 @@
       <input type="text" class="input web-url" placeholder="Type a URL, e.g. en.wikipedia.org" />
       <button class="btn small primary web-go">Go</button>
       <button class="btn small web-pop" title="Open in a real browser tab">↗</button>
-      <button class="btn small ok web-cast" title="Cast this browser to your students (switches the broadcast to live screen capture)">📡 Cast</button>
+      <button class="btn small ok web-cast" title="Cast this page to your students — works on every device">📡 Cast</button>
+      <span class="web-readerbar hide" style="display:flex;gap:4px;align-items:center">
+        <button class="btn small web-fontdn" title="Smaller text">A−</button>
+        <button class="btn small web-fontup" title="Bigger text">A＋</button>
+        <button class="btn small web-livecast hide" title="True live screen capture (desktop browsers only)">🎥 Live</button>
+      </span>
     </div>
     <div class="quick-links">
-      <button class="btn small ghost web-quick" data-u="https://en.wikipedia.org">Wikipedia</button>
-      <button class="btn small ghost web-quick" data-u="https://www.openstreetmap.org/export/embed.html">Map</button>
+      <button class="btn small ghost web-quick" data-u="https://en.wikipedia.org/wiki/Nigeria">Wikipedia</button>
+      <button class="btn small ghost web-quick" data-u="https://simple.wikipedia.org/wiki/Mathematics">Simple Wiki</button>
       <button class="btn small ghost web-quick" data-u="https://www.desmos.com/calculator">Desmos</button>
       <button class="btn small ghost web-quick" data-u="https://www.geogebra.org/calculator">GeoGebra</button>
       <button class="btn small ghost web-quick" data-u="https://archive.org">Archive.org</button>
     </div>
     <iframe class="web-frame" id="webFrame" style="flex:1;border:none;background:#fff" referrerpolicy="no-referrer"></iframe>
-    <div class="web-note">💡 Tap <b>📡 Cast</b> so students see this browser LIVE. Some sites (Google, YouTube watch pages…) refuse to embed — use ↗ or the quick links.</div>
+    <div class="web-reader hide" style="flex:1;position:relative;background:#fff"></div>
+    <div class="web-note">💡 Tap <b>📡 Cast</b> — the page is converted to a clean Reader view that streams to your students on ANY device (tablet included). Tap Cast again to return to normal browsing.</div>
   </section>
 </template>
 
@@ -769,6 +775,7 @@ Not sure</textarea>
 <script src="vendor/qrcode.min.js"></script>
 <script src="js/common.js"></script>
 <script src="js/whiteboard.js"></script>
+<script src="js/webcast.js"></script>
 <script src="js/toolkit.js"></script>
 <script src="js/toolkit-data.js"></script>
 <script src="js/toolkit-data2.js"></script>
