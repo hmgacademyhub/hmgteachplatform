@@ -43,6 +43,8 @@
     <button class="btn small" id="btnChat" title="Class chat">💬</button>
     <button class="btn small" id="btnPoll" title="Quick poll">📊</button>
     <button class="btn small" id="btnQuiz" title="Quiz with auto-scoring &amp; leaderboard">🏆</button>
+    <button class="btn small" id="btnBoards" title="Student whiteboards — every student gets a board only you can see">🎨</button>
+    <button class="btn small" id="btnActivity" title="Activities: open question, word cloud, exit ticket">🧩</button>
     <button class="btn small" id="btnCalc" title="Floating calculator">🧮</button>
     <button class="btn small" id="btnTimer" title="Countdown timer">⏱</button>
 
@@ -358,6 +360,7 @@
           <option value="tally">📊 Tally chart</option>
           <option value="score">🏅 Team scoreboard</option>
           <option value="letters">🅰 Letter formation</option>
+          <option value="noise">🔊 Noise meter</option>
         </optgroup>
         <optgroup label="Library (161 reference cards)">
           <option value="cards">📇 Reference library — Maths · Science · English · Social · ICT</option>
@@ -511,6 +514,8 @@
       <button class="btn small" id="btnAttendance">📋 Attendance CSV</button>
       <button class="btn small" id="btnAskAllCams">📷 Ask all cams</button>
       <button class="btn small" id="btnReport">📈 Class report</button>
+      <button class="btn small" id="btnGroups" title="Random group maker — students are told their group number">👥 Groups</button>
+      <button class="btn small" id="btnBehaviorCSV" title="Behaviour points export">⭐ Points CSV</button>
     </div>
     <hr class="sep" />
     <div id="waitingList"></div>
@@ -533,6 +538,45 @@
       <button class="btn primary" id="chatSend">➤</button>
     </div>
     <button class="btn small ghost" id="btnAnnounce" style="margin-top:8px">📢 Send full-screen announcement</button>
+  </div>
+</aside>
+
+<aside class="drawer" id="drawerBoards">
+  <div class="drawer-head">🎨 Student whiteboards <button class="btn small ghost drawer-close">✕</button></div>
+  <div class="drawer-body">
+    <p style="font-size:12.5px;color:var(--text-dim)">Every student gets a personal board that <b>only you</b> can see — perfect for "everyone solve this now". Push your current whiteboard page as their background.</p>
+    <div class="row" style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn primary" id="boardsStart">▶ Start boards</button>
+      <button class="btn danger hide" id="boardsStop">⏹ Stop</button>
+      <button class="btn small" id="boardsPush" title="Send your current whiteboard page to all student boards as a background">📤 Push my board</button>
+    </div>
+    <div id="boardsGrid" class="cam-grid" style="margin-top:8px"></div>
+  </div>
+</aside>
+
+<aside class="drawer" id="drawerActivity">
+  <div class="drawer-head">🧩 Activities <button class="btn small ghost drawer-close">✕</button></div>
+  <div class="drawer-body">
+    <div id="actSetup">
+      <label>Type</label>
+      <select class="input" id="actKind">
+        <option value="open">💬 Open question — students type, you see all answers</option>
+        <option value="cloud">☁ Word cloud — one-word answers build a live cloud</option>
+        <option value="exit">🎟 Exit ticket — rating + learned + still confusing</option>
+      </select>
+      <label style="margin-top:8px">Prompt</label>
+      <input class="input" id="actPrompt" placeholder="e.g. In one word, how do you feel about today's topic?" />
+      <button class="btn primary" id="actStart" style="margin-top:10px">Start activity</button>
+    </div>
+    <div id="actLive" class="hide">
+      <b id="actLiveTitle"></b>
+      <p style="font-size:12.5px;color:var(--text-dim)"><span id="actCount">0</span> response(s)</p>
+      <div id="actResponses" style="display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow:auto"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn ok" id="actEndShare">End &amp; show class results</button>
+        <button class="btn" id="actEndQuiet">End quietly</button>
+      </div>
+    </div>
   </div>
 </aside>
 

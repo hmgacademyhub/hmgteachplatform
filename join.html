@@ -90,6 +90,58 @@
   </div>
 </aside>
 
+<!-- v8: personal student whiteboard (teacher-only visibility) -->
+<div id="sBoardWrap" class="hide" style="position:fixed;inset:0;z-index:70;background:rgba(8,10,30,.96);display:flex;flex-direction:column">
+  <div style="display:flex;gap:6px;align-items:center;padding:8px 10px;background:var(--bg-2)">
+    <b style="font-size:14px">🎨 Your whiteboard</b>
+    <span style="font-size:11.5px;color:var(--text-dim)">only your teacher sees this</span>
+    <span style="flex:1"></span>
+    <span class="sb-colors" style="display:flex;gap:4px">
+      <span class="sb-c" data-c="#111111" style="width:24px;height:24px;border-radius:50%;background:#111;cursor:pointer;border:2px solid #fff"></span>
+      <span class="sb-c" data-c="#e02b2b" style="width:24px;height:24px;border-radius:50%;background:#e02b2b;cursor:pointer;border:2px solid transparent"></span>
+      <span class="sb-c" data-c="#1565d8" style="width:24px;height:24px;border-radius:50%;background:#1565d8;cursor:pointer;border:2px solid transparent"></span>
+      <span class="sb-c" data-c="#0a8a3a" style="width:24px;height:24px;border-radius:50%;background:#0a8a3a;cursor:pointer;border:2px solid transparent"></span>
+    </span>
+    <button class="btn small" id="sbUndo">↩</button>
+    <button class="btn small" id="sbClear">🗑</button>
+    <button class="btn small" id="sbMin" title="Back to the lesson view">📺 Lesson</button>
+  </div>
+  <div id="sBoardStage" style="flex:1;position:relative;background:#fff;touch-action:none"></div>
+</div>
+<button id="sbReopen" class="btn icon hide" style="position:fixed;left:14px;bottom:74px;z-index:60" title="Open my whiteboard">🎨</button>
+
+<!-- v8: group banner -->
+<div id="sGroupBanner" class="hide" style="position:fixed;top:0;left:0;right:0;z-index:65;background:#1d6f42;color:#fff;text-align:center;padding:7px;font-weight:700;font-size:15px"></div>
+
+<!-- v8: activity modal -->
+<div class="modal-back" id="mActivity">
+  <div class="modal">
+    <h3 id="sActTitle">🧩 Activity</h3>
+    <div id="sActOpen" class="hide">
+      <textarea class="input" id="sActText" rows="3" maxlength="280" placeholder="Type your answer…"></textarea>
+    </div>
+    <div id="sActExit" class="hide">
+      <label style="font-size:13px;color:var(--text-dim)">How well did you understand today? </label>
+      <div id="sActStars" style="display:flex;gap:6px;font-size:30px;cursor:pointer;margin:6px 0">
+        <span data-r="1">☆</span><span data-r="2">☆</span><span data-r="3">☆</span><span data-r="4">☆</span><span data-r="5">☆</span>
+      </div>
+      <input class="input" id="sActLearned" placeholder="One thing you learned today" style="margin-top:6px" />
+      <input class="input" id="sActConfusing" placeholder="One thing still confusing (optional)" style="margin-top:6px" />
+    </div>
+    <button class="btn primary" id="sActSend" style="margin-top:10px">Send ➜</button>
+    <p id="sActDone" class="hide" style="color:var(--ok);font-weight:700;margin-top:8px">✔ Sent — thank you!</p>
+  </div>
+</div>
+
+<!-- v8: class results modal -->
+<div class="modal-back" id="mActResults">
+  <div class="modal">
+    <h3 id="sResTitle">☁ Class results</h3>
+    <div id="sResBody" style="line-height:2;max-height:60vh;overflow:auto"></div>
+    <button class="btn primary" onclick="closeModal('#mActResults')" style="margin-top:8px">Close</button>
+  </div>
+</div>
+
 <!-- v4: reaction picker -->
 <div id="reactBar" class="hide" style="position:fixed;bottom:74px;left:50%;transform:translateX(-50%);z-index:60;display:flex;gap:6px;background:rgba(16,20,43,.92);border:1px solid var(--line);border-radius:999px;padding:8px 12px">
   <button class="btn icon ghost react-emo">👍</button>

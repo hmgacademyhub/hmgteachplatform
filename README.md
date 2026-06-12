@@ -65,7 +65,23 @@ nothing for Android to kill.
 
 ---
 
-# 🆕 What's new in v7
+# 🆕 What's new in v8 — the competitive-parity release
+
+Built after deep market research into the leading classroom platforms — **Whiteboard.fi (Kahoot)**, **ClassIn**, **Nearpod**, **Pear Deck**, **ClassDojo**, **Mentimeter/Socrative** and **Kahoot/Blooket/Gimkit**. The signature features they charge for are now built into CLASS DECK, free:
+
+| # | Feature (inspired by) | Detailed explanation |
+|---|----------------------|----------------------|
+| 1 | **🎨 Individual student whiteboards** *(Whiteboard.fi's flagship — their paid tier)* | Tap **🎨 → ▶ Start boards** and **every student instantly gets a personal whiteboard** on their device (colour pens, undo, clear) that **only you can see** — students never see each other's boards. Their strokes stream live into a grid in your 🎨 drawer; tap any tile to enlarge and watch one student work in real time. **📤 Push my board** sends your current whiteboard page (e.g. the question you just wrote) onto every student board as a background — "everyone, solve this now". Students can flip between their board and the lesson view (📺 Lesson / 🎨 reopen buttons). This is THE formative-assessment feature teachers love Whiteboard.fi for — here it's integrated with your live class, not a separate site. |
+| 2 | **🧩 Activities: open question, live word cloud, exit ticket** *(Pear Deck / Nearpod / Mentimeter)* | The new 🧩 drawer launches three interaction types to every student device: **💬 Open question** — students type free-text answers; responses stream into your drawer with names. **☁ Word cloud** — students send ONE word; ending the activity renders a real word cloud on every student's screen (words sized by frequency, coloured) — magical for "describe today's topic in one word". **🎟 Exit ticket** — the classic end-of-lesson check: a 1–5 star understanding rating + "one thing you learned" + "one thing still confusing", collected per student so you know exactly what to reteach tomorrow. You choose whether to share results with the class or end quietly. |
+| 3 | **⭐ Behaviour points** *(ClassDojo's core loop)* | Every roster row now has four award buttons: **⭐ Participation +1, 🤝 Teamwork +1, 💡 Great answer +2, ⚠ Off-task −1**. Awards fly up everyone's screens with the student's name (positive reinforcement in front of peers!), the receiving student gets a personal toast, totals accumulate per category, and **⭐ Points CSV** exports the full behaviour register for parents' meetings — the heart of ClassDojo without the subscription. |
+| 4 | **👥 Random group maker** *(ClassDojo toolkit / ClassIn breakouts)* | One tap asks "how many groups?", shuffles all connected students fairly, shows you the full list, and **tells every student their group number** with a green banner on their screen — instant think-pair-share or project teams with zero admin. |
+| 5 | **🔊 Noise meter** *(ClassDojo toolkit)* | A new Toolkit mode: a live class-volume gauge using the device microphone (green→amber→red arc, smoothed level, peak memory). Set a threshold (tap left/right) — the screen flashes red with "TOO LOUD!" when the class crosses it. Broadcastable like every toolkit tool, so the class self-regulates by watching the gauge. Nothing is recorded or transmitted. |
+
+*(Already at parity from earlier versions: Kahoot-style gamified quizzes with speed bonuses & podium (v3), CSV question import (v6), waiting room & PIN (v4/v6), reactions & spotlight (v4), attendance & analytics exports (v3/v5), per-teacher branded recording (v7) — see below.)*
+
+---
+
+# What was new in v7
 
 | # | Feature | Detailed explanation |
 |---|---------|----------------------|
