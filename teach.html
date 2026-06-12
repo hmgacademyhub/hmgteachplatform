@@ -57,6 +57,12 @@
   <!-- floating handle to exit focus mode -->
   <button id="focusHandle" class="focus-handle hide" title="Show toolbar">☰</button>
 
+  <!-- v6: license badge -->
+  <span id="authBadge" class="badge hide" style="position:fixed;bottom:8px;left:8px;z-index:400;font-size:10.5px"></span>
+
+  <!-- v6: lock screen when trial expired & no license -->
+  <div id="authGate" class="hide" style="position:fixed;inset:0;z-index:880;background:rgba(7,10,25,.92);backdrop-filter:blur(4px)"></div>
+
   <!-- ============ SPLIT WORKSPACE ============ -->
   <div class="workspace" id="workspace">
 
@@ -225,6 +231,12 @@
       <button class="btn small gr-clear">Clear</button>
       <button class="btn small gr-zo">−</button>
       <button class="btn small gr-zi">＋</button>
+      <select class="input gr-bg" style="width:auto;padding:5px" title="Background — improve visibility for students">
+        <option value="light">⬜ White</option>
+        <option value="cream">🟨 Cream</option>
+        <option value="dark">⬛ Dark</option>
+        <option value="board">🟩 Green board</option>
+      </select>
     </div>
     <div class="gr-stage" style="flex:1;position:relative;background:#fff;touch-action:none">
       <canvas class="gr-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
@@ -253,14 +265,104 @@
   <section class="app-toolkit active">
     <div class="pdf-bar">
       <select class="input tk-mode" style="width:auto;padding:6px 8px">
-        <option value="periodic">⚛ Periodic table</option>
-        <option value="lab">🧪 Lab equipment</option>
-        <option value="plant">🌿 Plant cell</option>
-        <option value="animal">🐾 Animal cell</option>
-        <option value="units">📏 Units of measurement</option>
-        <option value="convert">🔁 Unit converter</option>
-        <option value="mult">✖ Multiplication table</option>
+        <optgroup label="Mathematics">
+          <option value="construct">📐 Geometry construction</option>
+          <option value="mult">✖ Multiplication table</option>
+          <option value="numline">📏 Number line</option>
+          <option value="fraction">🍕 Fraction visualizer</option>
+          <option value="abacus">🧮 Place-value abacus</option>
+          <option value="hundred">🔢 Hundred square</option>
+          <option value="balance">⚖ Algebra balance</option>
+          <option value="clock">🕐 Teaching clock</option>
+          <option value="convert">🔁 Unit converter</option>
+          <option value="units">📏 Units of measurement</option>
+        </optgroup>
+        <optgroup label="Science">
+          <option value="periodic">⚛ Periodic table</option>
+          <option value="lab">🧪 Lab equipment</option>
+          <option value="plant">🌿 Plant cell</option>
+          <option value="animal">🐾 Animal cell</option>
+          <option value="thermo">🌡 Thermometer</option>
+        </optgroup>
+        <optgroup label="Classroom">
+          <option value="random">🎲 Dice · coin · spinner · names</option>
+          <option value="tally">📊 Tally chart</option>
+          <option value="score">🏅 Team scoreboard</option>
+          <option value="letters">🅰 Letter formation</option>
+        </optgroup>
+        <optgroup label="Library (93 reference cards)">
+          <option value="cards">📇 Reference library — Maths · Science · English · Social · ICT</option>
+        </optgroup>
       </select>
+      <!-- construction toolbar -->
+      <span class="tk-conbar hide" style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap">
+        <button class="btn small tk-con active" data-ct="ruler">📏 Ruler</button>
+        <button class="btn small tk-con" data-ct="compass">🧭 Compass</button>
+        <button class="btn small tk-con" data-ct="protractor">📐 Protractor</button>
+        <button class="btn small tk-con" data-ct="perpbis">⊥ Perp. bisector</button>
+        <button class="btn small tk-con" data-ct="angbis">∠ Angle bisector</button>
+        <button class="btn small tk-con" data-ct="point">• Point</button>
+        <button class="btn small tk-con" data-ct="erase">🧽</button>
+        <button class="btn small tk-con-undo">↩</button>
+        <button class="btn small tk-con-clear">🗑</button>
+      </span>
+      <!-- number line bar -->
+      <span class="tk-nlbar hide" style="display:flex;gap:4px;align-items:center">
+        <input class="input tk-nlmin" type="number" value="-10" style="width:70px;padding:5px" title="min" />
+        <input class="input tk-nlmax" type="number" value="10" style="width:70px;padding:5px" title="max" />
+        <select class="input tk-nlstep" style="width:auto;padding:5px"><option>1</option><option>0.5</option><option>0.25</option><option>2</option><option>5</option><option>10</option></select>
+      </span>
+      <!-- fraction bar -->
+      <span class="tk-frbar hide" style="display:flex;gap:4px;align-items:center">
+        <input class="input tk-fn1" type="number" value="1" min="0" style="width:56px;padding:5px" />/<input class="input tk-fd1" type="number" value="2" min="1" style="width:56px;padding:5px" />
+        <span style="font-size:13px">vs</span>
+        <input class="input tk-fn2" type="number" value="2" min="0" style="width:56px;padding:5px" />/<input class="input tk-fd2" type="number" value="3" min="1" style="width:56px;padding:5px" />
+        <select class="input tk-frmode" style="width:auto;padding:5px"><option value="circle">Circle</option><option value="bar">Bar</option></select>
+      </span>
+      <!-- random bar -->
+      <span class="tk-rndbar hide" style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
+        <select class="input tk-rndmode" style="width:auto;padding:5px">
+          <option value="dice">Dice</option><option value="coin">Coin</option>
+          <option value="spinner">Spinner</option><option value="names">Name picker</option>
+        </select>
+        <select class="input tk-dicen" style="width:auto;padding:5px"><option>1</option><option>2</option><option>3</option></select>
+        <input class="input tk-names" placeholder="Ada, Bayo, Chidi, …" style="flex:1;min-width:60px;padding:5px" />
+      </span>
+      <!-- tally bar -->
+      <span class="tk-tallybar hide" style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
+        <input class="input tk-tallyitems" placeholder="Option A, Option B, Option C" style="flex:1;min-width:80px;padding:5px" />
+        <button class="btn small tk-tallyset">Set</button>
+      </span>
+      <!-- scoreboard bar -->
+      <span class="tk-scbar hide" style="display:flex;gap:4px;align-items:center">
+        <select class="input tk-scn" style="width:auto;padding:5px"><option>2</option><option>3</option><option>4</option></select>
+        <input class="input tk-scnames" placeholder="Red, Blue" style="width:150px;padding:5px" />
+        <button class="btn small tk-screset">↺ 0</button>
+      </span>
+      <!-- balance bar -->
+      <span class="tk-balbar hide" style="display:flex;gap:4px;align-items:center">
+        <span style="font-size:12.5px">x =</span><input class="input tk-balx" type="number" value="4" style="width:60px;padding:5px" />
+        <span style="font-size:12.5px">+</span><input class="input tk-bala" type="number" value="3" style="width:60px;padding:5px" />
+        <span style="font-size:12.5px">coeff</span><input class="input tk-balm" type="number" value="1" min="1" max="9" style="width:56px;padding:5px" />
+        <button class="btn small tk-balset">New puzzle</button>
+      </span>
+      <!-- hundred square bar -->
+      <span class="tk-hsbar hide" style="display:flex;gap:4px;align-items:center">
+        <span style="font-size:12.5px">Count in</span>
+        <select class="input tk-hskip" style="width:auto;padding:5px"><option value="0">—</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option></select>
+        <button class="btn small tk-hsclear">Clear marks</button>
+      </span>
+      <!-- letters bar -->
+      <span class="tk-ltbar hide" style="display:flex;gap:4px;align-items:center">
+        <input class="input tk-ltchar" maxlength="1" value="A" style="width:56px;padding:5px;text-align:center;font-weight:700" />
+        <button class="btn small tk-ltprev">‹</button><button class="btn small tk-ltnext">›</button>
+      </span>
+      <!-- cards bar -->
+      <span class="tk-cardbar hide" style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
+        <select class="input tk-cardcat" style="width:auto;padding:5px"></select>
+        <input class="input tk-cardq" placeholder="Search 93 cards…" style="flex:1;min-width:70px;padding:5px" />
+        <button class="btn small tk-cardprev">‹</button><button class="btn small tk-cardnext">›</button>
+      </span>
       <span class="tk-convbar hide" style="display:flex;gap:5px;align-items:center;flex:1;min-width:0">
         <select class="input tk-cat" style="width:auto;padding:5px"></select>
         <input class="input tk-val" type="number" value="1" style="width:84px;padding:5px" />
@@ -354,6 +456,19 @@ Solve x+2=5
         <button class="btn small" id="quizSaveBank" title="Save these questions on this device">💾 Save bank</button>
         <select class="input" id="quizBankSel" style="width:auto"><option value="">Load saved…</option></select>
       </div>
+      <hr class="sep" />
+      <b style="font-size:13px">📤 Or upload a CSV file</b>
+      <p style="font-size:11.5px;color:var(--text-dim);margin:4px 0">
+        Format (with or without a header row):<br/>
+        <code>Question, A, B, C, D, Correct option, Explanation/working</code><br/>
+        Correct option = A/B/C/D (or 1–4). Explanation is shown to students after they answer.
+      </p>
+      <div class="row">
+        <button class="btn small" id="quizCsvBtn">📂 Choose CSV file</button>
+        <input type="file" id="quizCsvFile" class="hide" accept=".csv,text/csv" />
+        <button class="btn small ghost" id="quizCsvTemplate">⬇ Sample CSV</button>
+      </div>
+      <p id="quizCsvStatus" style="font-size:12px;color:var(--text-dim)"></p>
     </div>
     <div id="quizLive" class="hide">
       <b id="quizLiveTitle"></b>
@@ -368,7 +483,10 @@ Solve x+2=5
     <hr class="sep" />
     <b style="font-size:13px">Leaderboard (this class)</b>
     <div id="leaderList" style="display:flex;flex-direction:column;gap:6px"></div>
-    <button class="btn small" id="scoreReset">↺ Reset all scores</button>
+    <div class="row" style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn small" id="scoreReset">↺ Reset all scores</button>
+      <button class="btn small" id="scoreExport" title="Per-student scores as CSV — open in Excel/Sheets for your records">📥 Scores CSV</button>
+    </div>
   </div>
 </aside>
 
@@ -506,6 +624,54 @@ Not sure</textarea>
   </div>
 </div>
 
+<!-- v6: teacher license / activation -->
+<div class="modal-back" id="mAuth">
+  <div class="modal">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
+      <img src="assets/hmg-academy-logo.png" alt="" style="height:44px;border-radius:8px" />
+      <h3 style="margin:0">Teacher license</h3>
+    </div>
+    <p style="color:var(--text-dim);font-size:13.5px;line-height:1.6">
+      <b>Students always join free.</b> Teachers get a <b>14-day free trial</b>, then a small
+      license fee keeps HMG ACADEMY CLASS DECK running and supports new features.
+      Pay via the details on <a href="https://hmgacademy.pages.dev" target="_blank" rel="noopener" style="color:var(--brand)">hmgacademy.pages.dev</a>
+      (Paystack/Flutterwave/bank transfer) and receive your personal HMG ACCESS KEY on WhatsApp.
+    </p>
+    <label style="margin-top:8px">Your registered full name</label>
+    <input class="input" id="authName" placeholder="e.g. Mrs Funke Ojo" />
+    <label style="margin-top:8px">HMG ACCESS KEY</label>
+    <input class="input" id="authKey" placeholder="HMG-202612-XXXXXXXXXX" style="text-transform:uppercase" />
+    <p id="authStatus" style="font-size:13px;color:var(--danger);margin-top:6px"></p>
+    <div class="row" style="margin-top:8px">
+      <button class="btn primary" onclick="activateLicense()">Activate</button>
+      <button class="btn" onclick="closeModal('#mAuth')">Later</button>
+    </div>
+  </div>
+</div>
+
+<!-- v6: recording setup (YouTube-ready branded video) -->
+<div class="modal-back" id="mRecSetup">
+  <div class="modal">
+    <h3>⏺ Record lesson (YouTube-ready)</h3>
+    <p style="color:var(--text-dim);font-size:13px">The video records the two split panes with the HMG ACADEMY logo, subject, topic and class on a branded header — plus your camera (bottom-right) when it is on. Perfect for the <b>HMG CONCEPTS</b> YouTube channel.</p>
+    <label>Subject</label>
+    <input class="input" id="recSubject" placeholder="e.g. Mathematics" />
+    <label style="margin-top:8px">Topic</label>
+    <input class="input" id="recTopic" placeholder="e.g. Simultaneous Equations — Elimination Method" />
+    <label style="margin-top:8px">Class</label>
+    <input class="input" id="recClass" placeholder="e.g. SS2" />
+    <div class="row" style="margin-top:8px">
+      <label style="display:flex;align-items:center;gap:8px;margin:0">
+        <input type="checkbox" id="recStudents" /> Include student cameras (up to 3 tiles, left edge)
+      </label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary" id="recBegin">⏺ Start recording</button>
+      <button class="btn" onclick="closeModal('#mRecSetup')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- v3: class report modal -->
 <div class="modal-back" id="mReport">
   <div class="modal">
@@ -539,6 +705,9 @@ Not sure</textarea>
 <script src="js/common.js"></script>
 <script src="js/whiteboard.js"></script>
 <script src="js/toolkit.js"></script>
+<script src="js/toolkit-data.js"></script>
+<script src="js/toolkit-ext.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/rtc.js"></script>
 <script src="js/teach.js"></script>
 </body>
