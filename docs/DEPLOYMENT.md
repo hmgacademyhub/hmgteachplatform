@@ -1,10 +1,10 @@
-# 🚀 HMG ACADEMY CLASS DECK (v5) — Deployment Guide (step by step, free tools only)
+# 🚀 HMG ACADEMY CLASS DECK (v6) — Deployment Guide (step by step, free tools only)
 
-> v5 note: deployment is identical to earlier versions — it is still a pure static site
+> v6 note: deployment is identical to earlier versions — it is still a pure static site
 > with no build step. If you already deployed an earlier version, just push
 > these files over the old ones (CACHE_VERSION in `sw.js` is already bumped to
-> v5.0.0 so installed apps auto-update). Suggested repo: `hmg-classdeck`
-> (same repo, new commit) or `hmg-classdeck-v5` to keep versions side-by-side.
+> v6.0.0 so installed apps auto-update). Suggested repo: `hmg-classdeck`
+> (same repo, new commit) or `hmg-classdeck-v6` to keep versions side-by-side.
 
 This guide assumes **zero prior DevOps experience**. Follow it top-to-bottom once;
 future updates take under a minute.
@@ -201,3 +201,37 @@ If anything fails on step 3–5, check: HTTPS URL? Camera/mic permissions
 ---
 
 *Maintained for HMG Academy / HMG Technologies. Questions → see README.md.*
+
+---
+
+## Part 9 — v6: Setting up teacher licensing (SaaS)
+
+1. **Before deploying**, open `js/auth.js` and change
+   `const AUTH_SECRET = "CHANGE-ME-HMG-2026";` to your own private phrase.
+   Never share it. (Anyone who knows it could mint keys.)
+2. Deploy as usual. Bookmark `https://YOUR-SITE/admin.html` privately —
+   it is unlisted (robots-noindex) and useless without your secret phrase.
+3. Revenue flow:
+   - Teacher gets a 14-day free trial automatically (no signup friction).
+   - To continue, they pay your fee via Paystack/Flutterwave payment link,
+     bank transfer or POS (put the details on hmgacademy.pages.dev).
+   - On admin.html: type your secret + their full name + expiry month →
+     generate the key → send it on WhatsApp.
+   - Teacher enters name + key once in the Studio → licensed until expiry.
+4. Renewal = generate a new key with a later expiry month.
+5. Students NEVER pay and never see the license system.
+6. Optional upgrade path (still free): move key validation into a
+   Cloudflare Worker (free tier 100k req/day) so keys can be revoked
+   centrally; the current offline scheme requires no servers at all.
+
+## Part 10 — v6: CSV quiz format
+
+Create in Excel/Google Sheets and export as CSV:
+
+| Question | A | B | C | D | Correct option | Explanation/working |
+|---|---|---|---|---|---|---|
+| What is 54 ÷ 6? | 9 | 8 | 7 | 6 | A | 54 ÷ 6 = 9 because 6 × 9 = 54 |
+
+- Correct option: A/B/C/D or 1/2/3/4.
+- The explanation appears to each student immediately after they answer.
+- Download a ready template with the “⬇ Sample CSV” button in the Quiz drawer.
