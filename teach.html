@@ -202,15 +202,76 @@
       <span class="web-readerbar hide" style="display:flex;gap:4px;align-items:center">
         <button class="btn small web-fontdn" title="Smaller text">A−</button>
         <button class="btn small web-fontup" title="Bigger text">A＋</button>
+        <select class="input web-theme" style="width:auto;padding:5px" title="Reading theme">
+          <option value="light">⬜ Light</option>
+          <option value="sepia">📜 Sepia</option>
+          <option value="dark">⬛ Dark</option>
+          <option value="board">🟩 Board</option>
+        </select>
         <button class="btn small web-livecast hide" title="True live screen capture (desktop browsers only)">🎥 Live</button>
       </span>
     </div>
     <div class="quick-links">
-      <button class="btn small ghost web-quick" data-u="https://en.wikipedia.org/wiki/Nigeria">Wikipedia</button>
-      <button class="btn small ghost web-quick" data-u="https://simple.wikipedia.org/wiki/Mathematics">Simple Wiki</button>
+      <select class="input web-linklib" style="width:auto;max-width:46%;padding:6px 8px" title="Curated education library — Nursery to Senior Secondary">
+        <option value="">📚 Education library…</option>
+        <optgroup label="🧸 Nursery / Early years">
+          <option value="https://storyweaver.org.in">StoryWeaver — free picture story books</option>
+          <option value="https://www.storyberries.com">Storyberries — bedtime stories & poems</option>
+          <option value="https://en.wikibooks.org/wiki/Wikijunior">Wikijunior — books for young children</option>
+          <option value="https://www.monkeypen.com/pages/free-childrens-books">Monkey Pen — free children's books</option>
+          <option value="https://supersimple.com/super-simple-songs/">Super Simple Songs — rhymes & songs</option>
+        </optgroup>
+        <optgroup label="🎒 Primary">
+          <option value="https://simple.wikipedia.org">Simple English Wikipedia</option>
+          <option value="https://kids.nationalgeographic.com">Nat Geo Kids — animals & science</option>
+          <option value="https://www.coolmath4kids.com">CoolMath4Kids — games & lessons</option>
+          <option value="https://www.ducksters.com">Ducksters — history, science, biography</option>
+          <option value="https://www.funbrain.com">Funbrain — reading & maths games</option>
+          <option value="https://www.nasa.gov/learning-resources/nasa-kids-club/">NASA Kids Club</option>
+        </optgroup>
+        <optgroup label="📐 Mathematics">
+          <option value="https://www.desmos.com/calculator">Desmos graphing calculator</option>
+          <option value="https://www.geogebra.org/calculator">GeoGebra — graphing & geometry</option>
+          <option value="https://www.mathsisfun.com">Maths Is Fun — clear explanations</option>
+          <option value="https://www.transum.org">Transum — starters & puzzles</option>
+          <option value="https://nrich.maths.org">NRICH — rich maths problems</option>
+          <option value="https://www.openmiddle.com">Open Middle — challenge problems</option>
+        </optgroup>
+        <optgroup label="🔬 Science">
+          <option value="https://phet.colorado.edu/en/simulations/browse">PhET — interactive simulations</option>
+          <option value="https://ptable.com">Ptable — live periodic table</option>
+          <option value="https://www.bbc.co.uk/bitesize">BBC Bitesize — all subjects</option>
+          <option value="https://www.ck12.org">CK-12 — free STEM textbooks</option>
+          <option value="https://solarsystem.nasa.gov">NASA Solar System</option>
+          <option value="https://www.biologycorner.com">Biology Corner — worksheets</option>
+        </optgroup>
+        <optgroup label="📖 English & Literature">
+          <option value="https://www.gutenberg.org">Project Gutenberg — 70k free books</option>
+          <option value="https://en.wiktionary.org">Wiktionary — dictionary</option>
+          <option value="https://www.poetryfoundation.org">Poetry Foundation</option>
+          <option value="https://openlibrary.org">Open Library — borrow books</option>
+          <option value="https://www.grammarly.com/blog/category/handbook/">Grammar handbook</option>
+        </optgroup>
+        <optgroup label="🌍 Social Studies & ICT">
+          <option value="https://www.britannica.com">Encyclopaedia Britannica</option>
+          <option value="https://en.wikipedia.org/wiki/Nigeria">Wikipedia — Nigeria</option>
+          <option value="https://www.worldometers.info">Worldometers — live world data</option>
+          <option value="https://code.org">Code.org — learn coding</option>
+          <option value="https://scratch.mit.edu">Scratch — block programming</option>
+        </optgroup>
+        <optgroup label="🎓 Exams (Nigeria) & Open courses">
+          <option value="https://www.waeconline.org.ng">WAEC e-Learning portal</option>
+          <option value="https://www.jamb.gov.ng">JAMB official</option>
+          <option value="https://myschool.ng/classroom">Myschool — past questions</option>
+          <option value="https://www.khanacademy.org">Khan Academy — full courses</option>
+          <option value="https://openstax.org/subjects">OpenStax — free textbooks</option>
+          <option value="https://archive.org">Internet Archive</option>
+        </optgroup>
+      </select>
+      <button class="btn small ghost web-quick" data-u="https://simple.wikipedia.org">Simple Wiki</button>
       <button class="btn small ghost web-quick" data-u="https://www.desmos.com/calculator">Desmos</button>
-      <button class="btn small ghost web-quick" data-u="https://www.geogebra.org/calculator">GeoGebra</button>
-      <button class="btn small ghost web-quick" data-u="https://archive.org">Archive.org</button>
+      <button class="btn small ghost web-quick" data-u="https://phet.colorado.edu/en/simulations/browse">PhET</button>
+      <button class="btn small ghost web-quick" data-u="https://www.khanacademy.org">Khan</button>
     </div>
     <iframe class="web-frame" id="webFrame" style="flex:1;border:none;background:#fff" referrerpolicy="no-referrer"></iframe>
     <div class="web-reader hide" style="flex:1;position:relative;background:#fff"></div>
@@ -724,13 +785,22 @@ Not sure</textarea>
 <div class="modal-back" id="mRecSetup">
   <div class="modal">
     <h3>⏺ Record lesson (YouTube-ready)</h3>
-    <p style="color:var(--text-dim);font-size:13px">The video records the two split panes with the HMG ACADEMY logo, subject, topic and class on a branded header — plus your camera (bottom-right) when it is on. Perfect for the <b>HMG CONCEPTS</b> YouTube channel.</p>
+    <p style="color:var(--text-dim);font-size:13px">Records the two split panes under a branded header — <b>your own brand, logo and name</b> — plus your camera (bottom-right) when it is on. Ready to post on your channel.</p>
     <label>Subject</label>
     <input class="input" id="recSubject" placeholder="e.g. Mathematics" />
     <label style="margin-top:8px">Topic</label>
     <input class="input" id="recTopic" placeholder="e.g. Simultaneous Equations — Elimination Method" />
     <label style="margin-top:8px">Class</label>
     <input class="input" id="recClass" placeholder="e.g. SS2" />
+    <label style="margin-top:8px">Brand name on the video (your academy / your name)</label>
+    <input class="input" id="recBrand" placeholder="e.g. Funke's Tutorials" />
+    <label style="margin-top:8px">Footer credit (e.g. your YouTube / WhatsApp)</label>
+    <input class="input" id="recFooter" placeholder="e.g. ▶ Funke's Tutorials on YouTube · 0803-xxx-xxxx" />
+    <div class="row" style="margin-top:6px">
+      <button class="btn small" id="recLogoBtn">🖼 Upload your logo (optional)</button>
+      <input type="file" id="recLogoFile" class="hide" accept="image/*" />
+      <span id="recLogoStatus" style="font-size:12px;color:var(--text-dim)"></span>
+    </div>
     <div class="row" style="margin-top:8px">
       <label style="display:flex;align-items:center;gap:8px;margin:0">
         <input type="checkbox" id="recStudents" /> Include student cameras (up to 3 tiles, left edge)

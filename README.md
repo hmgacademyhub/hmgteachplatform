@@ -1,4 +1,4 @@
-# HMG ACADEMY CLASS DECK (v6) — Split-Screen Teaching Studio 🧑‍🏫
+# HMG ACADEMY CLASS DECK (v7) — Split-Screen Teaching Studio 🧑‍🏫
 
 **By Adewale Samson Adeagbo** — AI-Augmented Solutions Developer · Data Scientist · STEM Educator (Lagos, Nigeria).
 Founder of HMG ACADEMY and the HMG family of brands:
@@ -65,7 +65,19 @@ nothing for Android to kill.
 
 ---
 
-# 🆕 What's new in v6.1 (the professional/SaaS release)
+# 🆕 What's new in v7
+
+| # | Feature | Detailed explanation |
+|---|---------|----------------------|
+| 1 | **📚 Curated education library (40+ vetted links, Nursery → SS3)** | The browser pane now opens with a grouped **“📚 Education library…”** dropdown beside the quick buttons, hand-picked for reader-friendliness and teaching value: **Nursery/Early years** (StoryWeaver free picture books, Storyberries, Wikijunior, Monkey Pen free children's books, Super Simple Songs), **Primary** (Simple English Wikipedia, Nat Geo Kids, CoolMath4Kids, Ducksters, Funbrain, NASA Kids Club), **Mathematics** (Desmos, GeoGebra, Maths Is Fun, Transum starters, NRICH problems, Open Middle), **Science** (PhET simulations, Ptable live periodic table, BBC Bitesize, CK-12 textbooks, NASA Solar System, Biology Corner), **English & Literature** (Project Gutenberg, Wiktionary, Poetry Foundation, Open Library, Grammarly handbook), **Social Studies & ICT** (Britannica, Worldometers live data, Code.org, Scratch), and **Nigerian exams & open courses** (WAEC e-Learning, JAMB, Myschool past questions, Khan Academy, OpenStax, Internet Archive). Picking an entry navigates the pane AND feeds Reader Cast automatically. |
+| 2 | **📖 Reader Cast 2.0 — magazine-quality rendering** | The cast renderer was rebuilt to look professional on tablets: an **article card layout** with a centred reading column at a comfortable measure, real **typography** (Georgia serif body, bold sans headings with accent underline, larger lead paragraph), styled **blockquotes** with accent bars, bullet/numbered lists, **rounded images with italic captions** and graceful skeleton loaders, junk-line cleanup (menus, cookie banners, “skip to content” are stripped) and soft-wrap merging so paragraphs read naturally. Four **reading themes** — Light / Sepia / Dark / Green-board — with matched palettes (remembered between sessions), a top **reading-progress bar**, an estimated **“~N min read”** chip, smooth momentum scrolling plus **tap-bottom = page-down, tap-top = page-up** for one-handed tablet use. Font size (A−/A＋) is also remembered. |
+| 3 | **🛡 Revenue protection (security v2)** | Five new layers on top of v6: **(a) PBKDF2 key-stretching** (120,000 iterations) for new account passwords — brute-forcing a leaked record becomes ~120,000× harder; old accounts still log in. **(b) Central revocation** — the app fetches `revoked.json` from YOUR deployment on every studio start (cached offline): add a leaked/refunded key or a blocked email to that file, push to GitHub, and every installed app blocks it within minutes — a free kill-switch with no servers. **(c) Device binding** — accounts are bound to a per-device ID; copying localStorage to another tablet invalidates the account instead of cloning the trial. **(d) Runtime heartbeat** — the broadcaster re-checks authentication every ~5 seconds of streaming; deleting the auth overlay or flipping the flag in DevTools kills the live class automatically. **(e) Modern security headers** (`_headers`): X-Frame-Options, nosniff, strict referrer policy, camera/mic permissions policy, and admin.html marked noindex. |
+| 4 | **🎬 Per-teacher recording brands** | Recordings now carry **the recording teacher's own brand, not HMG's**: the setup dialog asks for *Brand name* (prefills from their account), *Footer credit* (their YouTube/WhatsApp line) and an optional **logo upload** (auto-downscaled and stored on their device). The video header shows their logo — or a clean coloured initial badge if none — with their brand on both sides; the footer carries their credit line (defaulting to a subtle “Recorded with HMG ACADEMY CLASS DECK”); the filename starts with their brand (`Funkes-Tutorials_Maths_…webm`). Every teacher-client gets YouTube-ready videos under their own identity — a real selling point for your subscriptions. |
+| 5 | **🏗 Modern platform engineering** | Brought the repo in line with modern static-app practice: **`_headers`** (security + immutable caching for assets/vendor on Cloudflare Pages/Netlify), **`robots.txt`** (admin page hidden from search), **`version.json`** (single source of truth for version/build), **Open Graph + Twitter meta** for rich link previews when you share the platform on WhatsApp/X, long-cache immutable headers for static assets, and **`scripts/validate.sh`** — a one-command CI-style pre-deploy check (JS syntax, JSON validity, broken-asset scan) you can run before every push. |
+
+---
+
+# What was new in v6.1 (still here)
 
 | # | Feature | Detailed explanation |
 |---|---------|----------------------|
