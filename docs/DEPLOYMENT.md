@@ -1,10 +1,10 @@
-# 🚀 HMG ACADEMY CLASS DECK (v4) — Deployment Guide (step by step, free tools only)
+# 🚀 HMG ACADEMY CLASS DECK (v5) — Deployment Guide (step by step, free tools only)
 
-> v4 note: deployment is identical to earlier versions — it is still a pure static site
+> v5 note: deployment is identical to earlier versions — it is still a pure static site
 > with no build step. If you already deployed an earlier version, just push
 > these files over the old ones (CACHE_VERSION in `sw.js` is already bumped to
-> v4.0.0 so installed apps auto-update). Suggested repo: `hmg-classdeck`
-> (same repo, new commit) or `hmg-classdeck-v4` to keep versions side-by-side.
+> v5.0.0 so installed apps auto-update). Suggested repo: `hmg-classdeck`
+> (same repo, new commit) or `hmg-classdeck-v5` to keep versions side-by-side.
 
 This guide assumes **zero prior DevOps experience**. Follow it top-to-bottom once;
 future updates take under a minute.

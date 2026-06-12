@@ -1,4 +1,4 @@
-# 🎓 HMG ACADEMY CLASS DECK (v4) — Quick User Guide
+# 🎓 HMG ACADEMY CLASS DECK (v5) — Quick User Guide
 
 Print this or keep it open during your first classes.
 
@@ -81,6 +81,12 @@ and your boards are exactly where you left them (autosave).
 | Play an experiment clip | pane tab 🎬 → open local video |
 | Remove someone | 👥 → ✕ next to their name |
 | Run a scored quiz | 🏆 → type/load questions (* = correct) → Start |
+| Show the periodic table / cells / lab kit | pane tab 🧰 → choose the tool |
+| Convert units live for the class | 🧰 → Unit converter |
+| See a student's screen/work | 👥 → 🖥 next to their name (they consent) |
+| Reply privately to one student | tick "Reply privately" in 💬 |
+| Resume class after a crash/refresh | tap "▶ Resume class now" on the green bar |
+| Run two classes from one device | ↺ beside the room code = fresh room |
 | See who's winning | 🏆 drawer → Leaderboard |
 | Show a calculator on screen | 🧮 (drag it anywhere) |
 | Put a diagram photo on the board | board toolbar → 🖼 |
@@ -124,6 +130,13 @@ and your boards are exactly where you left them (autosave).
    leaderboard at the end.
 8. If your teacher set a **Class PIN**, type it on the join screen (ask your
    teacher if you don't have it).
+9. **Early?** Join anyway — you'll wait in the lobby and enter automatically
+   the moment your teacher goes live. Keep the page open.
+10. **Show your work:** tap 🖥 to share your screen with the teacher (only the
+    teacher sees it). Tap again to stop.
+11. **Private question?** Tick "send privately to teacher only" in the chat.
+12. **Connection lost?** Stay on the page — a yellow banner shows while it
+    reconnects you automatically (it keeps trying for up to 10 minutes).
 
 **Data-saving tip:** the class video is optimised for low data (~150–300 MB per
 hour at default quality). Wi-Fi is still cheaper than mobile data!
