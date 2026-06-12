@@ -62,6 +62,7 @@ Toolkit.prototype._extInit = function () {
 Toolkit.prototype._drawExt = function () {
   this._extInit();
   const fn = {
+    noise: this._drawNoise,
     construct: this._drawConstruct, clock: this._drawClock, numline: this._drawNumline,
     abacus: this._drawAbacus, fraction: this._drawFraction, random: this._drawRandom,
     tally: this._drawTally, score: this._drawScore, thermo: this._drawThermo,
@@ -74,6 +75,7 @@ Toolkit.prototype._drawExt = function () {
 Toolkit.prototype._tapExt = function (x, y) {
   this._extInit();
   const fn = {
+    noise: this._tapNoise,
     construct: this._tapConstruct, clock: this._tapClock, numline: this._tapNumline,
     abacus: this._tapAbacus, random: this._tapRandom, tally: this._tapTally,
     score: this._tapScore, thermo: this._tapThermo, hundred: this._tapHundred,
@@ -895,5 +897,101 @@ Toolkit.prototype._tapCards = function (x) {
   const cd = this._ext.cd;
   if (x > W / 2) cd.idx = (cd.idx + 1) % list.length;
   else cd.idx = (cd.idx - 1 + list.length) % list.length;
+  this.draw();
+};
+
+/* ============================================================
+   v8: 🔊 NOISE METER (ClassDojo-style) — toolkit mode "noise"
+   Uses the device microphone to display a live class-volume
+   gauge with a teacher-set threshold; flashes red when the
+   class is too loud. No audio is recorded or sent anywhere.
+   ============================================================ */
+Toolkit.prototype.startNoise = async function () {
+  this._extInit();
+  if (this._noise) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const srcN = ac.createMediaStreamSource(stream);
+    const an = ac.createAnalyser();
+    an.fftSize = 512;
+    srcN.connect(an);
+    this._noise = { stream, ac, an, buf: new Uint8Array(an.frequencyBinCount), level: 0, peak: 0, limit: 0.55, overSince: 0 };
+    const tick = () => {
+      if (!this._noise || this.mode !== "noise") return;
+      this._noise.an.getByteFrequencyData(this._noise.buf);
+      let sum = 0;
+      for (const v of this._noise.buf) sum += v;
+      const lvl = Math.min(1, (sum / this._noise.buf.length) / 110);
+      this._noise.level = this._noise.level * 0.75 + lvl * 0.25;
+      this._noise.peak = Math.max(this._noise.peak * 0.995, this._noise.level);
+      this.draw();
+      requestAnimationFrame(tick);
+    };
+    tick();
+  } catch {
+    this._noiseError = "Microphone blocked — allow mic access to use the noise meter.";
+    this.draw();
+  }
+};
+Toolkit.prototype.stopNoise = function () {
+  if (this._noise) {
+    try { this._noise.stream.getTracks().forEach((t) => t.stop()); this._noise.ac.close(); } catch {}
+    this._noise = null;
+  }
+};
+Toolkit.prototype._drawNoise = function () {
+  const ctx = this.ctx, { W, H } = this._dims();
+  const n = this._noise;
+  ctx.fillStyle = "#f4f8ff"; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center";
+  if (this._noiseError) {
+    ctx.fillStyle = "#b3261e"; ctx.font = this._fitFont(W / 36) ;
+    ctx.fillText(this._noiseError, W / 2, H / 2);
+    return;
+  }
+  if (!n) {
+    ctx.fillStyle = "#445"; ctx.font = this._fitFont(W / 30);
+    ctx.fillText("🔊 Tap anywhere to start the noise meter", W / 2, H / 2);
+    return;
+  }
+  const over = n.level > n.limit;
+  /* gauge arc */
+  const cx = W / 2, cy = H * 0.62, R = Math.min(W, H) * 0.34;
+  ctx.lineWidth = Math.max(14, R * 0.13);
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "#e3e8f4";
+  ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI, 2 * Math.PI); ctx.stroke();
+  const segs = [[0, .45, "#2ecc71"], [.45, .75, "#f59e0b"], [.75, 1, "#e02b2b"]];
+  for (const [a, b, col] of segs) {
+    const upTo = Math.min(n.level, b);
+    if (upTo <= a) continue;
+    ctx.strokeStyle = col;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, Math.PI + a * Math.PI, Math.PI + upTo * Math.PI);
+    ctx.stroke();
+  }
+  /* threshold tick */
+  const ta = Math.PI + n.limit * Math.PI;
+  ctx.strokeStyle = "#1e2a78"; ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(cx + Math.cos(ta) * (R - R * 0.16), cy + Math.sin(ta) * (R - R * 0.16));
+  ctx.lineTo(cx + Math.cos(ta) * (R + R * 0.16), cy + Math.sin(ta) * (R + R * 0.16));
+  ctx.stroke();
+  /* status */
+  ctx.fillStyle = over ? "#e02b2b" : "#0a8a3a";
+  ctx.font = "bold " + this._fitFont(W * 0.05);
+  ctx.fillText(over ? "TOO LOUD!" : "Nice and calm", W / 2, H * 0.18);
+  ctx.fillStyle = "#445"; ctx.font = this._fitFont(W / 50);
+  ctx.fillText("Level " + Math.round(n.level * 100) + "%  ·  limit " + Math.round(n.limit * 100) + "% — tap LEFT to lower / RIGHT to raise the limit", W / 2, H * 0.9);
+  if (over) {
+    ctx.fillStyle = "rgba(224,43,43,.12)";
+    ctx.fillRect(0, 0, W, H);
+  }
+};
+Toolkit.prototype._tapNoise = function (x) {
+  if (!this._noise) { this.startNoise(); return; }
+  const { W } = this._dims();
+  this._noise.limit = Math.max(0.2, Math.min(0.95, this._noise.limit + (x > W / 2 ? 0.05 : -0.05)));
   this.draw();
 };

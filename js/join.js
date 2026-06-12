@@ -488,3 +488,192 @@ function cleanupAndGate(message) {
   window._wantWake = false; keepAwake(false);
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
 }
+
+/* ============================================================
+   v8 STUDENT FEATURES
+   ============================================================ */
+
+/* ---------- v8.1 personal whiteboard ---------- */
+let sbOn = false, sbColor = "#111111", sbStrokes = [], sbCur = null, sbCanvas = null, sbCtx = null;
+let sbSendTimer = null;
+
+function sbInit() {
+  if (sbCanvas) return;
+  sbCanvas = document.createElement("canvas");
+  sbCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;touch-action:none";
+  $("#sBoardStage").appendChild(sbCanvas);
+  sbCtx = sbCanvas.getContext("2d");
+  new ResizeObserver(sbResize).observe($("#sBoardStage"));
+  sbResize();
+  sbCanvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    sbCanvas.setPointerCapture(e.pointerId);
+    sbCur = { c: sbColor, w: 3, p: [sbPos(e)] };
+  });
+  sbCanvas.addEventListener("pointermove", (e) => {
+    if (!sbCur) return;
+    e.preventDefault();
+    sbCur.p.push(sbPos(e));
+    sbDraw();
+  });
+  const up = () => {
+    if (!sbCur) return;
+    sbStrokes.push(sbCur);
+    sbCur = null;
+    sbDraw();
+    sbQueueSend();
+  };
+  sbCanvas.addEventListener("pointerup", up);
+  sbCanvas.addEventListener("pointercancel", up);
+  $$(".sb-c").forEach((c) => c.addEventListener("click", () => {
+    sbColor = c.dataset.c;
+    $$(".sb-c").forEach((x) => x.style.borderColor = "transparent");
+    c.style.borderColor = "#fff";
+  }));
+  $("#sbUndo").addEventListener("click", () => { sbStrokes.pop(); sbDraw(); sbQueueSend(true); });
+  $("#sbClear").addEventListener("click", () => { sbStrokes = []; sbDraw(); sbQueueSend(true); });
+  $("#sbMin").addEventListener("click", () => {
+    $("#sBoardWrap").classList.add("hide");
+    $("#sbReopen").classList.remove("hide");
+  });
+  $("#sbReopen").addEventListener("click", () => {
+    $("#sBoardWrap").classList.remove("hide");
+    $("#sbReopen").classList.add("hide");
+  });
+}
+function sbPos(e) {
+  const r = sbCanvas.getBoundingClientRect();
+  return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height];
+}
+function sbResize() {
+  if (!sbCanvas) return;
+  const r = $("#sBoardStage").getBoundingClientRect();
+  sbCanvas.width = Math.max(50, r.width);
+  sbCanvas.height = Math.max(50, r.height);
+  sbDraw();
+}
+let sbBg = null;
+function sbDraw() {
+  if (!sbCtx) return;
+  const W = sbCanvas.width, H = sbCanvas.height;
+  sbCtx.fillStyle = "#fff"; sbCtx.fillRect(0, 0, W, H);
+  if (sbBg && sbBg.complete) {
+    const s = Math.min(W / sbBg.naturalWidth, H / sbBg.naturalHeight);
+    sbCtx.globalAlpha = 0.85;
+    sbCtx.drawImage(sbBg, (W - sbBg.naturalWidth * s) / 2, (H - sbBg.naturalHeight * s) / 2,
+      sbBg.naturalWidth * s, sbBg.naturalHeight * s);
+    sbCtx.globalAlpha = 1;
+  }
+  sbCtx.lineCap = "round"; sbCtx.lineJoin = "round";
+  for (const s of [...sbStrokes, ...(sbCur ? [sbCur] : [])]) {
+    sbCtx.strokeStyle = s.c; sbCtx.lineWidth = s.w;
+    sbCtx.beginPath();
+    s.p.forEach(([x, y], i) => i ? sbCtx.lineTo(x * W, y * H) : sbCtx.moveTo(x * W, y * H));
+    sbCtx.stroke();
+  }
+}
+function sbQueueSend(full) {
+  clearTimeout(sbSendTimer);
+  sbSendTimer = setTimeout(() => {
+    if (sRoom) sRoom.sendBoardStrokes(sbStrokes.slice(-40), true);
+  }, full ? 100 : 450);
+}
+
+/* ---------- v8.2 activities ---------- */
+let actKind = null, actRating = 0;
+function showActivity(def) {
+  actKind = def.kind;
+  $("#sActTitle").textContent = ({ open: "💬 ", cloud: "☁ ", exit: "🎟 " })[def.kind] + def.prompt;
+  $("#sActOpen").classList.toggle("hide", def.kind === "exit");
+  $("#sActExit").classList.toggle("hide", def.kind !== "exit");
+  $("#sActText").value = "";
+  $("#sActText").placeholder = def.kind === "cloud" ? "One word only…" : "Type your answer…";
+  $("#sActText").maxLength = def.kind === "cloud" ? 24 : 280;
+  $("#sActDone").classList.add("hide");
+  $("#sActSend").classList.remove("hide");
+  actRating = 0;
+  $$("#sActStars span").forEach((s) => s.textContent = "☆");
+  openModal("#mActivity");
+}
+$$("#sActStars span").forEach((s) => s.addEventListener("click", () => {
+  actRating = Number(s.dataset.r);
+  $$("#sActStars span").forEach((x) => x.textContent = Number(x.dataset.r) <= actRating ? "⭐" : "☆");
+}));
+$("#sActSend").addEventListener("click", () => {
+  let resp;
+  if (actKind === "exit") {
+    resp = { rating: actRating || 3, learned: $("#sActLearned").value.trim(), confusing: $("#sActConfusing").value.trim() };
+  } else {
+    resp = $("#sActText").value.trim();
+    if (!resp) { toast("Type something first"); return; }
+    if (actKind === "cloud") resp = resp.split(/\s+/)[0].slice(0, 24);
+  }
+  sRoom.sendActivityResp(resp);
+  $("#sActSend").classList.add("hide");
+  $("#sActDone").classList.remove("hide");
+  setTimeout(() => closeModal("#mActivity"), 1500);
+});
+
+function showActivityResults(d) {
+  $("#sResTitle").textContent = (d.kind === "cloud" ? "☁ " : "💬 ") + d.prompt;
+  const body = $("#sResBody");
+  if (d.kind === "cloud") {
+    /* build a word cloud: count words, size by frequency */
+    const counts = {};
+    d.items.forEach((w) => {
+      const k = String(w).toLowerCase();
+      counts[k] = (counts[k] || 0) + 1;
+    });
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 40);
+    const max = entries.length ? entries[0][1] : 1;
+    const colors = ["#4f6ef7", "#e02b2b", "#0a8a3a", "#f59e0b", "#8b5cf6", "#0891b2"];
+    body.innerHTML = entries.map(([w, n], i) =>
+      '<span style="font-size:' + (15 + (n / max) * 26) + 'px;color:' + colors[i % 6] +
+      ';font-weight:700;margin:0 8px;display:inline-block">' + escapeHtml(w) + "</span>").join(" ");
+    body.style.textAlign = "center";
+  } else {
+    body.style.textAlign = "left";
+    body.innerHTML = d.items.map((t) => '<div class="chat-msg">' + escapeHtml(String(t)) + "</div>").join("");
+  }
+  openModal("#mActResults");
+}
+
+/* ---------- v8 event routing ---------- */
+const _v7OnEvent = onEvent;
+onEvent = function (type, p) {
+  _v7OnEvent(type, p);
+  switch (type) {
+    case "boards":
+      if (p.on) {
+        sbInit();
+        sbStrokes = [];
+        sbBg = null;
+        if (p.bg) { sbBg = new Image(); sbBg.src = p.bg; sbBg.onload = sbDraw; }
+        $("#sBoardWrap").classList.remove("hide");
+        $("#sbReopen").classList.add("hide");
+        sbDraw();
+        toast("🎨 Your teacher opened personal whiteboards — solve here!", "ok", 5000);
+      } else {
+        $("#sBoardWrap").classList.add("hide");
+        $("#sbReopen").classList.add("hide");
+      }
+      break;
+    case "boardsBg":
+      if (p.bg) { sbBg = new Image(); sbBg.src = p.bg; sbBg.onload = sbDraw; toast("📤 Teacher sent a new board background"); }
+      break;
+    case "activity": showActivity(p); break;
+    case "activityEnd": closeModal("#mActivity"); break;
+    case "activityResults": showActivityResults(p); break;
+    case "award":
+      sFlyEmoji(p.emoji || "⭐", p.name);
+      if (p.name === Store.get("stuname", "")) toast((p.delta > 0 ? "⭐ You earned +" : "⚠ ") + p.delta + " — " + p.category, p.delta > 0 ? "ok" : "", 4000);
+      break;
+    case "group": {
+      const b = $("#sGroupBanner");
+      b.textContent = "👥 You are in GROUP " + p.num + " (of " + p.of + ")";
+      b.classList.remove("hide");
+      setTimeout(() => b.classList.add("hide"), 30000);
+      break;
+    }
+  }
+};

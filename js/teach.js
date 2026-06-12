@@ -308,6 +308,7 @@ function initToolkit(side, inst) {
   $(".tk-mode", el).addEventListener("change", (e) => {
     const m = e.target.value;
     Object.entries(bars).forEach(([mode, sel]) => $(sel, el).classList.toggle("hide", mode !== m));
+    if (m !== "noise" && tk.stopNoise) tk.stopNoise();   /* v8 */
     tk.setMode(m);
   });
   /* show construct bar initially */
@@ -2711,3 +2712,191 @@ document.addEventListener("keydown", (e) => {
 if (typeof requireTeacherAccess === "function") {
   requireTeacherAccess();
 }
+
+/* ============================================================
+   v8 FEATURES — competitive parity pack
+   (researched against ClassIn, Nearpod, Pear Deck, Whiteboard.fi,
+    ClassDojo, Mentimeter/Socrative, Kahoot/Blooket)
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   v8.1 STUDENT WHITEBOARDS (Whiteboard.fi's signature feature)
+   Teacher starts boards → every student gets a personal canvas;
+   strokes stream to the teacher's grid live; teacher can push
+   their own current board page as the background for all.
+   ------------------------------------------------------------ */
+const stuBoards = new Map();   // peerId -> {canvas, ctx, name}
+
+$("#btnBoards").addEventListener("click", () => toggleDrawer("#drawerBoards"));
+
+$("#boardsStart").addEventListener("click", () => {
+  if (!room) { toast("Go live first (▶ Go Live)", "err"); return; }
+  room.startBoards(currentBoardPNG());
+  $("#boardsStart").classList.add("hide");
+  $("#boardsStop").classList.remove("hide");
+  toast("🎨 Student boards ON — answers appear below as they draw", "ok", 5000);
+});
+$("#boardsStop").addEventListener("click", () => {
+  if (room) room.stopBoards();
+  $("#boardsStop").classList.add("hide");
+  $("#boardsStart").classList.remove("hide");
+  stuBoards.clear();
+  $("#boardsGrid").innerHTML = "";
+});
+$("#boardsPush").addEventListener("click", () => {
+  if (!room || !room.boardsOn) { toast("Start boards first"); return; }
+  const png = currentBoardPNG();
+  if (png) { room.pushBoardBg(png); toast("📤 Your board pushed to all students", "ok"); }
+});
+
+function currentBoardPNG() {
+  const inst = (paneState.L.app === "board" && paneState.L.instances.board) ||
+               (paneState.R.app === "board" && paneState.R.instances.board);
+  if (!inst || !inst.wb) return null;
+  try {
+    const c = document.createElement("canvas");
+    c.width = 640; c.height = Math.round(640 * inst.wb.canvas.height / Math.max(1, inst.wb.canvas.width));
+    c.getContext("2d").drawImage(inst.wb.canvas, 0, 0, c.width, c.height);
+    return c.toDataURL("image/jpeg", 0.7);
+  } catch { return null; }
+}
+
+function renderStudentBoard(p) {
+  let sb = stuBoards.get(p.peerId);
+  if (!sb) {
+    const tile = document.createElement("div");
+    tile.className = "cam-tile";
+    tile.style.background = "#fff";
+    tile.innerHTML = '<canvas style="width:100%;height:100%"></canvas><span class="label">' + escapeHtml(p.name) + "</span>";
+    tile.addEventListener("click", () => tile.classList.toggle("focus"));
+    $("#boardsGrid").appendChild(tile);
+    const canvas = tile.querySelector("canvas");
+    canvas.width = 480; canvas.height = 360;
+    sb = { canvas, ctx: canvas.getContext("2d"), name: p.name, strokes: [] };
+    sb.ctx.fillStyle = "#fff";
+    sb.ctx.fillRect(0, 0, 480, 360);
+    stuBoards.set(p.peerId, sb);
+  }
+  if (p.full) { sb.strokes = p.strokes || []; }
+  else sb.strokes.push(...(p.strokes || []));
+  /* redraw */
+  const ctx = sb.ctx;
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 480, 360);
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for (const s of sb.strokes) {
+    ctx.strokeStyle = s.c || "#111";
+    ctx.lineWidth = (s.w || 3);
+    ctx.beginPath();
+    (s.p || []).forEach(([x, y], i) => {
+      i ? ctx.lineTo(x * 480, y * 360) : ctx.moveTo(x * 480, y * 360);
+    });
+    ctx.stroke();
+  }
+}
+
+/* ------------------------------------------------------------
+   v8.2 ACTIVITIES (Mentimeter/Pear Deck style)
+   open question | live word cloud | exit ticket
+   ------------------------------------------------------------ */
+$("#btnActivity").addEventListener("click", () => toggleDrawer("#drawerActivity"));
+
+$("#actStart").addEventListener("click", () => {
+  if (!room) { toast("Go live first", "err"); return; }
+  const kind = $("#actKind").value;
+  let prompt = $("#actPrompt").value.trim();
+  if (kind === "exit" && !prompt) prompt = "Before you go…";
+  if (!prompt) { toast("Type a prompt", "err"); return; }
+  room.startActivity({ kind, prompt });
+  $("#actSetup").classList.add("hide");
+  $("#actLive").classList.remove("hide");
+  $("#actLiveTitle").textContent = ({ open: "💬 ", cloud: "☁ ", exit: "🎟 " })[kind] + prompt;
+  $("#actResponses").innerHTML = "";
+  $("#actCount").textContent = "0";
+  toast("🧩 Activity sent to all students", "ok");
+});
+
+function endActivity(share) {
+  if (!room) return;
+  room.endActivity(share);
+  $("#actSetup").classList.remove("hide");
+  $("#actLive").classList.add("hide");
+  toast(share ? "Results shown to the class" : "Activity ended");
+}
+$("#actEndShare").addEventListener("click", () => endActivity(true));
+$("#actEndQuiet").addEventListener("click", () => endActivity(false));
+
+function renderActivityResp(p) {
+  $("#actCount").textContent = p.count;
+  const div = document.createElement("div");
+  div.className = "chat-msg";
+  if (typeof p.resp === "object" && p.resp && p.resp.rating !== undefined) {
+    div.innerHTML = '<div class="who">' + escapeHtml(p.name) + "</div>" +
+      "⭐".repeat(Math.max(1, Math.min(5, p.resp.rating))) +
+      "<br/><b>Learned:</b> " + escapeHtml(p.resp.learned || "—") +
+      "<br/><b>Confusing:</b> " + escapeHtml(p.resp.confusing || "—");
+  } else {
+    div.innerHTML = '<div class="who">' + escapeHtml(p.name) + "</div>" + escapeHtml(String(p.resp));
+  }
+  $("#actResponses").prepend(div);
+}
+
+/* ------------------------------------------------------------
+   v8.3 BEHAVIOUR POINTS (ClassDojo style) — buttons per student
+   added into the roster rows + class toast on award
+   ------------------------------------------------------------ */
+const AWARDS = [
+  ["⭐", "Participation", 1], ["🤝", "Teamwork", 1], ["💡", "Great answer", 2], ["⚠", "Off-task", -1]
+];
+
+function attachAwardButtons() {
+  $$("#rosterList .stu-row").forEach((row) => {
+    if (row.querySelector(".award-btn")) return;
+    const name = row.querySelector(".name");
+    const wrap = document.createElement("span");
+    wrap.style.cssText = "display:flex;gap:2px";
+    AWARDS.forEach(([emo, cat, delta]) => {
+      const b = document.createElement("button");
+      b.className = "btn small ghost award-btn";
+      b.textContent = emo;
+      b.title = cat + " (" + (delta > 0 ? "+" : "") + delta + ")";
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (!room) return;
+        for (const [pid, stu] of room.students) {
+          if (stu.name === name.textContent) { room.awardPoint(pid, cat, delta, emo); break; }
+        }
+      });
+      wrap.appendChild(b);
+    });
+    name.after(wrap);
+  });
+}
+$("#btnBehaviorCSV").addEventListener("click", () => {
+  if (!room) { toast("Go live first"); return; }
+  downloadBlob(new Blob([room.behaviorCSV()], { type: "text/csv" }),
+    "behaviour-points-" + roomCode + "-" + Date.now() + ".csv");
+});
+
+/* ------------------------------------------------------------
+   v8.4 GROUP MAKER (ClassDojo/ClassIn style)
+   ------------------------------------------------------------ */
+$("#btnGroups").addEventListener("click", () => {
+  if (!room || room.students.size < 2) { toast("Need at least 2 students online"); return; }
+  const n = Math.min(room.students.size, Math.max(2, Number(prompt("How many groups?", "2")) || 2));
+  const groups = room.makeGroups(n);
+  const txt = groups.map((g, i) => "Group " + (i + 1) + ": " + g.join(", ")).join("\n");
+  alert("Groups created — every student has been told their group:\n\n" + txt);
+  if (room) room.sendAnnouncement("👥 Check your group number at the top of your screen!");
+});
+
+/* ------------------------------------------------------------
+   v8 event hookup
+   ------------------------------------------------------------ */
+const _v7OnRoomEvent = onRoomEvent;
+onRoomEvent = function (type, p) {
+  _v7OnRoomEvent(type, p);
+  if (type === "board-strokes") renderStudentBoard(p);
+  if (type === "activity-resp") renderActivityResp(p);
+  if (type === "award") toast(p.delta > 0 ? "⭐ +" + p.delta + " " + p.name : "⚠ " + p.delta + " " + p.name, "", 2500);
+  if (type === "roster" || type === "student-joined") setTimeout(attachAwardButtons, 120);
+};

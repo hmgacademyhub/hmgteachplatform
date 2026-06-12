@@ -44,6 +44,9 @@ class TeacherRoom {
     this.waitingRoom = false;                         // v4: Zoom-style waiting room
     this.pending = new Map();                         // v4: peers awaiting admission
     this.pin = "";                                    // v3: optional room PIN
+    this.boardsOn = false;                            // v8: student whiteboards
+    this.activity = null;                             // v8: open/cloud/exit activity
+    this.groups = null;                               // v8: group assignments
     this.activeQuiz = null;                           // v3: quiz engine
     this.stats = { start: 0, peak: 0, joins: 0, chats: 0, polls: [], quizzes: [] }; // v3: analytics
     this._reconnectTimer = null;
@@ -214,6 +217,18 @@ class TeacherRoom {
       case "ping":
         conn.send({ t: "pong", time: Date.now() });
         break;
+      case "boardStrokes": {   /* v8: student whiteboard sync */
+        if (!this.boardsOn) break;
+        this.onEvent("board-strokes", { peerId: conn.peer, name: stu.name,
+          strokes: d.strokes, full: !!d.full });
+        break;
+      }
+      case "activityResp": {   /* v8: activity answer */
+        if (!this.activity) break;
+        this.activity.responses.set(conn.peer, { name: stu.name, resp: d.resp, at: Date.now() });
+        this.onEvent("activity-resp", { name: stu.name, resp: d.resp, count: this.activity.responses.size });
+        break;
+      }
     }
   }
 
@@ -307,6 +322,72 @@ class TeacherRoom {
   pollResults() {
     if (!this.activePoll) return null;
     return { question: this.activePoll.def.question, options: this.activePoll.def.options, counts: this.activePoll.counts.slice() };
+  }
+
+  /* ----- v8: individual student whiteboards (Whiteboard.fi style) ----- */
+  startBoards(bgDataUrl) {
+    this.boardsOn = true;
+    this.broadcast({ t: "boards", on: true, bg: bgDataUrl || null });
+  }
+  pushBoardBg(bgDataUrl) {
+    if (this.boardsOn) this.broadcast({ t: "boardsBg", bg: bgDataUrl });
+  }
+  stopBoards() {
+    this.boardsOn = false;
+    this.broadcast({ t: "boards", on: false });
+  }
+
+  /* ----- v8: activities (open question / word cloud / exit ticket) ----- */
+  startActivity(def) {
+    // def = { kind: "open"|"cloud"|"exit", prompt }
+    this.activity = { def, responses: new Map() };
+    this.broadcast({ t: "activity", def });
+  }
+  endActivity(showResults) {
+    if (!this.activity) return null;
+    const out = [...this.activity.responses.values()];
+    if (showResults) this.broadcast({ t: "activityResults", kind: this.activity.def.kind,
+      prompt: this.activity.def.prompt, items: out.map((r) => r.resp).slice(0, 80) });
+    this.broadcast({ t: "activityEnd" });
+    const a = this.activity; this.activity = null;
+    return a;
+  }
+
+  /* ----- v8: behaviour points (ClassDojo style) ----- */
+  awardPoint(peerId, category, delta, emoji) {
+    const stu = this.students.get(peerId);
+    if (!stu) return;
+    if (!stu.behavior) stu.behavior = {};
+    stu.behavior[category] = (stu.behavior[category] || 0) + delta;
+    stu.behaviorTotal = (stu.behaviorTotal || 0) + delta;
+    this.broadcast({ t: "award", name: stu.name, category, delta, emoji });
+    this.onEvent("award", { peerId, name: stu.name, category, delta, total: stu.behaviorTotal });
+  }
+  behaviorCSV() {
+    const cats = new Set();
+    for (const s of this.students.values()) if (s.behavior) Object.keys(s.behavior).forEach((c) => cats.add(c));
+    const cl = [...cats];
+    const rows = [["Student", ...cl, "Total"]];
+    for (const s of this.students.values()) {
+      rows.push([s.name, ...cl.map((c) => (s.behavior && s.behavior[c]) || 0), s.behaviorTotal || 0]);
+    }
+    return rows.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(",")).join("\n");
+  }
+
+  /* ----- v8: group maker ----- */
+  makeGroups(n) {
+    const ids = [...this.students.keys()];
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    const groups = Array.from({ length: n }, () => []);
+    ids.forEach((pid, i) => groups[i % n].push(pid));
+    this.groups = groups.map((g, gi) => g.map((pid) => {
+      const stu = this.students.get(pid);
+      try { stu.conn.send({ t: "group", num: gi + 1, of: n }); } catch {}
+      return stu.name;
+    }));
+    return this.groups;
   }
 
   /* ----- v3: quiz engine (auto-scored, with leaderboard) ----- */
@@ -446,6 +527,13 @@ class StudentRoom {
       case "admitted":  this.onEvent("admitted"); break;           // v4
       case "reaction":  this.onEvent("reaction", d); break;        // v4
       case "spotlight": this.onEvent("spotlight", d); break;       // v4
+      case "boards":    this.onEvent("boards", d); break;            // v8
+      case "boardsBg":  this.onEvent("boardsBg", d); break;          // v8
+      case "activity":  this.onEvent("activity", d.def); break;      // v8
+      case "activityEnd": this.onEvent("activityEnd"); break;        // v8
+      case "activityResults": this.onEvent("activityResults", d); break; // v8
+      case "award":     this.onEvent("award", d); break;             // v8
+      case "group":     this.onEvent("group", d); break;             // v8
     }
   }
 
@@ -455,6 +543,8 @@ class StudentRoom {
   answerPoll(index)   { this.send({ t: "pollAnswer", index }); }
   answerQuiz(qIndex, answer) { this.send({ t: "quizAnswer", qIndex, answer }); } // v3
   sendReaction(emoji) { this.send({ t: "reaction", emoji }); }                   // v4
+  sendBoardStrokes(strokes, full) { this.send({ t: "boardStrokes", strokes, full: !!full }); } // v8
+  sendActivityResp(resp) { this.send({ t: "activityResp", resp }); }             // v8
 
   async shareCamera(on) {
     if (!on) {
